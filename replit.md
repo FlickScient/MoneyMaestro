@@ -1,44 +1,63 @@
-# [Project name]
+# Money Maestro
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Professional money transaction tracker — track dues, debts, sales, purchases, and payments with a beautiful UI powered by Supabase.
 
 ## Run & Operate
 
+- `pnpm --filter @workspace/money-maestro run dev` — run the web app (port assigned by workflow)
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
 - `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- Required env: `DATABASE_URL` — Postgres connection string (api-server only)
 
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- Frontend: Vanilla HTML/CSS/JS served via Vite (single `index.html`)
+- Auth + DB: Supabase (CDN, email/password auth, RLS-secured transactions table)
+- API: Express 5 (api-server, not used by money-maestro directly)
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
-
-## Architecture decisions
-
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- `artifacts/money-maestro/index.html` — **entire app** (HTML + CSS + JS, single file)
+- `artifacts/api-server/` — Express API server (health check only currently)
+- `lib/api-spec/openapi.yaml` — API spec (health only)
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- **Auth**: Email/password login & registration with animated page transitions (slide left/right)
+- **Dashboard**: 4 summary cards — Total, Due, Debt, Paid — with live currency formatting
+- **Transactions**: Full CRUD — Add, Edit, Mark Paid, Delete with confirmation
+- **Bottom Sheet Modal**: Slides up from the bottom with smooth animation
+- **Filters**: All / Due / Debt / Paid / Overdue
+- **Sort**: Newest, Oldest, Amount ↑↓, Name A–Z, Due Soon
+- **Search**: Real-time name + reason search
+- **Multi-currency**: 12 currencies, persisted in localStorage
+- **Overdue detection**: Red pulsing badge when due_date passed and status is Pending
+- **Supabase RLS**: All queries auto-scoped to logged-in user via auth.uid()
+
+## Architecture decisions
+
+- Single `index.html` file: all CSS, HTML, and JS inline — no bundling needed, served by Vite as-is
+- Supabase via CDN: no npm package needed; `window.supabase.createClient()` used directly
+- `main.tsx` is a no-op export so Vite's module graph doesn't complain
+- Currency symbol persisted in `localStorage` under key `mm_sym`
+- Dates stored as ISO strings in Supabase, displayed as DD/MM/YYYY
+
+## Supabase Config
+
+- URL: https://xrchfqafpqfvjdqbibfw.supabase.co
+- Table: `transactions` (id, user_id, name, amount, phone, type, given_date, due_date, status, reason, created_at)
+- Auth: Email + password, session auto-persisted by Supabase SDK
+
+## Gotchas
+
+- After changing `index.html`, Vite HMR picks it up automatically — no restart needed
+- The `main.tsx` entry just exports `{}` — all real logic is in `index.html`'s `<script>` tag
+- RLS must be enabled on the `transactions` table in Supabase for user isolation to work
 
 ## User preferences
 
 _Populate as you build — explicit user instructions worth remembering across sessions._
-
-## Gotchas
-
-_Populate as you build — sharp edges, "always run X before Y" rules._
 
 ## Pointers
 

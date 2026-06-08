@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <title>Money Maestro — Master Your Finances</title>
+    <meta name="description" content="Money Maestro — Professional money transaction tracker. Track dues, debts, sales and payments." />
+    <meta property="og:title" content="Money Maestro" />
+    <meta property="og:description" content="Professional money transaction tracker" />
+    <meta property="og:type" content="website" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 72 72'%3E%3Ccircle cx='36' cy='36' r='34' fill='%23F97316'/%3E%3Ctext x='36' y='45' text-anchor='middle' font-family='Arial Black' font-weight='900' font-size='24' fill='white'%3EMM%3C/text%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      :root {
+        --bg: #FFFBF7;
+        --card: #FFFFFF;
+        --primary: #F97316;
+        --primary-dark: #EA580C;
+        --primary-light: #FFF7ED;
+        --due: #F97316;
+        --debt: #3B82F6;
+        --paid: #22C55E;
+        --danger: #EF4444;
+        --purple: #8B5CF6;
+        --pink: #EC4899;
+        --gray-type: #6B7280;
+        --text: #1A1A1A;
+        --muted: #9CA3AF;
+        --border: #F0E9E0;
+        --shadow: 0 2px 16px rgba(249,115,22,0.09);
+        --shadow-hover: 0 8px 32px rgba(249,115,22,0.18);
+        --radius: 16px;
+        --transition: 0.22s cubic-bezier(0.4,0,0.2,1);
+      }
+
+      html, body {
+        height: 100%;
+        font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        overflow-x: hidden;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ===== GLOBAL LOADER ===== */
+      #global-loader {
+        position: fixed; inset: 0;
+        background: rgba(255,251,247,0.92);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 9999;
+        backdrop-filter: blur(6px);
+        transition: opacity 0.3s ease;
+      }
+      #global-loader.hidden { opacity: 0; pointer-events: none; }
+      .loader-inner { text-align: center; }
+      .loader-logo {
+        width: 64px; height: 64px; margin: 0 auto 16px;
+        animation: logoBounce 1s ease-in-out infinite alternate;
+      }
+      @keyframes logoBounce {
+        from { transform: translateY(0) scale(1); }
+        to { transform: translateY(-8px) scale(1.04); }
+      }
+      .loader-spinner {
+        width: 36px; height: 36px;
+        border: 3px solid rgba(249,115,22,0.2);
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 0.75s linear infinite;
+        margin: 0 auto 10px;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .loader-text { font-size: 13px; font-weight: 700; color: var(--primary); }
+
+      /* ===== TOAST ===== */
+      #toast-stack {
+        position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+        z-index: 9998; display: flex; flex-direction: column-reverse; gap: 8px;
+        pointer-events: none; width: min(360px, calc(100vw - 32px));
+      }
+      .toast {
+        background: #111;
+        color: white;
+        padding: 13px 18px;
+        border-radius: 14px;
+        font-size: 13px; font-weight: 600;
+        display: flex; align-items: center; gap: 10px;
+        box-shadow: 0 8px 28px rgba(0,0,0,0.22);
+        animation: toastIn 0.32s cubic-bezier(0.34,1.56,0.64,1) both;
+        pointer-events: all;
+        border-left: 4px solid transparent;
+      }
+      .toast.success { background: #052e16; border-left-color: var(--paid); }
+      .toast.error   { background: #450a0a; border-left-color: var(--danger); }
+      .toast.info    { background: #0c1a2e; border-left-color: var(--debt); }
+      @keyframes toastIn {
+        from { opacity: 0; transform: translateY(14px) scale(0.94); }
+        to   { opacity: 1; transform: translateY(0) scale(1); }
+      }
+
+      /* ===== AUTH SECTION ===== */
+      #auth-section {
+        display: none;
+        min-height: 100vh;
+        background: linear-gradient(145deg, #fff8f0 0%, #fff3e6 40%, #fde8cf 100%);
+        align-items: center; justify-content: center;
+        padding: 24px 16px;
+        position: relative; overflow: hidden;
+      }
+      #auth-section.visible { display: flex; }
+
+      .auth-bubble {
+        position: absolute; border-radius: 50%;
+        background: radial-gradient(circle, rgba(249,115,22,0.12), transparent 70%);
+        pointer-events: none;
+      }
+      .auth-bubble-1 { width: 500px; height: 500px; top: -180px; right: -160px; animation: bubbleFloat 9s ease-in-out infinite; }
+      .auth-bubble-2 { width: 380px; height: 380px; bottom: -120px; left: -100px; animation: bubbleFloat 11s ease-in-out infinite reverse; }
+      .auth-bubble-3 { width: 200px; height: 200px; top: 40%; left: 10%; opacity: 0.5; animation: bubbleFloat 7s ease-in-out infinite 2s; }
+      @keyframes bubbleFloat {
+        0%,100% { transform: translateY(0) scale(1); }
+        50% { transform: translateY(-22px) scale(1.06); }
+      }
+
+      .auth-card {
+        width: 100%; max-width: 430px;
+        background: white;
+        border-radius: 28px;
+        box-shadow: 0 24px 70px rgba(249,115,22,0.14), 0 4px 20px rgba(0,0,0,0.05);
+        padding: 40px 36px 36px;
+        position: relative; z-index: 2;
+        overflow: hidden;
+      }
+      .auth-card::before {
+        content: '';
+        position: absolute; top: 0; left: 0; right: 0; height: 4px;
+        background: linear-gradient(90deg, #F97316, #EA580C, #FCD34D, #F97316);
+        background-size: 300% 100%;
+        animation: gradShimmer 3s linear infinite;
+      }
+      @keyframes gradShimmer {
+        from { background-position: 0% 0; }
+        to   { background-position: 300% 0; }
+      }
+
+      /* Logo */
+      .auth-logo-wrap { display: flex; flex-direction: column; align-items: center; margin-bottom: 32px; }
+      .auth-logo-svg {
+        width: 76px; height: 76px; margin-bottom: 12px;
+        animation: logoPulse 3.5s ease-in-out infinite;
+        filter: drop-shadow(0 6px 20px rgba(249,115,22,0.4));
+      }
+      @keyframes logoPulse {
+        0%,100% { filter: drop-shadow(0 6px 20px rgba(249,115,22,0.4)); transform: scale(1); }
+        50%      { filter: drop-shadow(0 8px 28px rgba(249,115,22,0.6)); transform: scale(1.03); }
+      }
+      .auth-logo-name {
+        font-size: 23px; font-weight: 800; letter-spacing: -0.4px;
+        background: linear-gradient(135deg, #F97316, #EA580C);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .auth-logo-tagline { font-size: 11px; color: var(--muted); font-weight: 700; letter-spacing: 1.8px; text-transform: uppercase; margin-top: 3px; }
+
+      /* Auth slide container */
+      .auth-slider { position: relative; overflow: hidden; }
+      .auth-panel {
+        transition: transform 0.48s cubic-bezier(0.4,0,0.2,1), opacity 0.4s ease;
+        will-change: transform, opacity;
+      }
+      .auth-panel.current     { transform: translateX(0);     opacity: 1; }
+      .auth-panel.slide-left  { transform: translateX(-115%); opacity: 0; pointer-events: none; position: absolute; top: 0; width: 100%; }
+      .auth-panel.slide-right { transform: translateX(115%);  opacity: 0; pointer-events: none; position: absolute; top: 0; width: 100%; }
+
+      .auth-heading { font-size: 21px; font-weight: 800; color: var(--text); margin-bottom: 4px; letter-spacing: -0.3px; }
+      .auth-sub     { font-size: 13px; color: var(--muted); margin-bottom: 22px; }
+
+      .field-group { margin-bottom: 15px; }
+      .field-label { display: block; font-size: 11px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: #555; margin-bottom: 7px; }
+      .field-input {
+        width: 100%; padding: 13px 16px;
+        border: 2px solid var(--border); border-radius: 12px;
+        font-size: 14px; font-family: inherit;
+        background: var(--bg); color: var(--text);
+        outline: none; transition: var(--transition);
+      }
+      .field-input:focus { border-color: var(--primary); background: white; box-shadow: 0 0 0 4px rgba(249,115,22,0.09); }
+      .field-input::placeholder { color: #C8B9AB; }
+
+      .pw-wrapper { position: relative; }
+      .pw-eye {
+        position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+        background: none; border: none; cursor: pointer;
+        font-size: 17px; line-height: 1; color: var(--muted);
+        transition: color var(--transition); padding: 4px;
+      }
+      .pw-eye:hover { color: var(--primary); }
+
+      .auth-err {
+        background: #fef2f2; border: 2px solid #fca5a5; border-radius: 10px;
+        padding: 10px 14px; font-size: 13px; font-weight: 600; color: var(--danger);
+        margin-bottom: 14px; display: none;
+      }
+      .auth-err.show { display: block; animation: errShake 0.28s ease; }
+      @keyframes errShake {
+        0%,100% { transform: translateX(0); }
+        25%      { transform: translateX(-5px); }
+        75%      { transform: translateX(5px); }
+      }
+
+      .btn-auth {
+        width: 100%; padding: 14px;
+        border-radius: 13px; border: none; cursor: pointer;
+        font-size: 15px; font-weight: 800; font-family: inherit;
+        background: linear-gradient(135deg, #F97316, #EA580C);
+        color: white;
+        box-shadow: 0 4px 18px rgba(249,115,22,0.42);
+        transition: all var(--transition);
+        position: relative; overflow: hidden;
+      }
+      .btn-auth:hover { transform: translateY(-2px); box-shadow: 0 7px 26px rgba(249,115,22,0.55); }
+      .btn-auth:active { transform: translateY(0); }
+      .btn-auth.busy   { opacity: 0.7; pointer-events: none; }
+
+      .auth-switch { text-align: center; margin-top: 18px; font-size: 13px; color: var(--muted); }
+      .auth-switch a { color: var(--primary); font-weight: 800; cursor: pointer; text-decoration: none; transition: color var(--transition); }
+      .auth-switch a:hover { color: var(--primary-dark); }
+
+      /* ===== APP SECTION ===== */
+      #app-section { display: none; flex-direction: column; min-height: 100vh; }
+      #app-section.visible { display: flex; }
+
+      /* Topbar */
+      .topbar {
+        background: linear-gradient(135deg, #F97316 0%, #EA580C 100%);
+        position: sticky; top: 0; z-index: 200;
+        box-shadow: 0 4px 20px rgba(249,115,22,0.32);
+      }
+      .topbar-inner {
+        max-width: 700px; margin: 0 auto;
+        display: flex; align-items: center; justify-content: space-between;
+        height: 62px; padding: 0 16px;
+      }
+      .topbar-brand { display: flex; align-items: center; gap: 10px; }
+      .topbar-mm {
+        width: 36px; height: 36px;
+        background: rgba(255,255,255,0.2);
+        border-radius: 10px; border: 1.5px solid rgba(255,255,255,0.3);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 12px; font-weight: 900; color: white;
+        letter-spacing: -0.5px; backdrop-filter: blur(4px);
+      }
+      .topbar-name { font-size: 17px; font-weight: 800; color: white; letter-spacing: -0.3px; }
+      .topbar-right { display: flex; align-items: center; gap: 8px; }
+      .topbar-user-badge {
+        font-size: 12px; color: rgba(255,255,255,0.8); font-weight: 600;
+        max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        background: rgba(255,255,255,0.12); padding: 5px 10px; border-radius: 20px;
+      }
+      .currency-pick {
+        background: rgba(255,255,255,0.15); border: 1.5px solid rgba(255,255,255,0.25);
+        border-radius: 8px; color: white; font-size: 13px; font-weight: 700;
+        padding: 6px 10px; cursor: pointer; font-family: inherit; outline: none;
+        backdrop-filter: blur(4px); transition: var(--transition);
+      }
+      .currency-pick:hover { background: rgba(255,255,255,0.25); }
+      .currency-pick option { background: #EA580C; color: white; }
+      .btn-signout {
+        background: rgba(255,255,255,0.14); border: 1.5px solid rgba(255,255,255,0.22);
+        border-radius: 9px; color: white; font-size: 12px; font-weight: 700;
+        padding: 7px 14px; cursor: pointer; font-family: inherit;
+        backdrop-filter: blur(4px); transition: var(--transition);
+      }
+      .btn-signout:hover { background: rgba(255,255,255,0.26); }
+
+      /* Main */
+      .main { flex: 1; max-width: 700px; width: 100%; margin: 0 auto; padding: 18px 16px 100px; }
+
+      /* Summary */
+      .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+      .sum-card {
+        background: var(--card); border-radius: 18px;
+        padding: 16px 14px 14px;
+        box-shadow: var(--shadow);
+        border-top: 3px solid var(--primary);
+        position: relative; overflow: hidden;
+        transition: transform var(--transition), box-shadow var(--transition);
+        cursor: default;
+      }
+      .sum-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-hover); }
+      .sum-card::after {
+        content: attr(data-emoji);
+        position: absolute; right: -6px; top: -6px;
+        font-size: 44px; opacity: 0.07;
+        pointer-events: none;
+      }
+      .sum-card[data-color="due"]    { border-top-color: var(--danger); }
+      .sum-card[data-color="debt"]   { border-top-color: var(--debt); }
+      .sum-card[data-color="paid"]   { border-top-color: var(--paid); }
+
+      .sum-icon { font-size: 18px; margin-bottom: 6px; }
+      .sum-label { font-size: 9.5px; font-weight: 800; color: var(--muted); letter-spacing: 1.3px; text-transform: uppercase; margin-bottom: 5px; }
+      .sum-amount { font-family: 'Space Mono', monospace; font-size: 14px; font-weight: 700; color: var(--text); letter-spacing: -0.5px; line-height: 1.3; }
+      .sum-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+      /* Controls */
+      .controls {
+        background: var(--card); border-radius: 18px;
+        padding: 14px; box-shadow: var(--shadow); margin-bottom: 16px;
+      }
+      .controls-row1 { display: flex; gap: 10px; margin-bottom: 11px; }
+      .btn-add-tx {
+        flex-shrink: 0;
+        background: linear-gradient(135deg, #F97316, #EA580C);
+        color: white; border: none; border-radius: 12px;
+        padding: 11px 16px; font-size: 13px; font-weight: 800;
+        font-family: inherit; cursor: pointer; white-space: nowrap;
+        box-shadow: 0 3px 14px rgba(249,115,22,0.38);
+        transition: all var(--transition);
+        display: flex; align-items: center; gap: 5px;
+      }
+      .btn-add-tx:hover { transform: translateY(-1px); box-shadow: 0 5px 20px rgba(249,115,22,0.5); }
+      .search-box {
+        flex: 1; padding: 11px 14px;
+        border: 2px solid var(--border); border-radius: 12px;
+        font-size: 13px; font-family: inherit;
+        background: var(--bg); color: var(--text);
+        outline: none; transition: var(--transition);
+      }
+      .search-box:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(249,115,22,0.07); }
+
+      .controls-row2 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+      .filter-row { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+      .f-chip {
+        padding: 6px 13px; border-radius: 30px; font-size: 11px; font-weight: 800;
+        cursor: pointer; border: 2px solid var(--border);
+        background: var(--bg); color: var(--muted);
+        transition: all var(--transition); font-family: inherit; white-space: nowrap;
+      }
+      .f-chip.on { background: var(--primary); color: white; border-color: var(--primary); box-shadow: 0 2px 10px rgba(249,115,22,0.32); }
+      .f-chip:not(.on):hover { border-color: var(--primary); color: var(--primary); }
+
+      .sort-pick {
+        padding: 7px 12px; border-radius: 10px; border: 2px solid var(--border);
+        font-size: 11px; font-weight: 700; color: var(--text);
+        background: var(--bg); cursor: pointer; font-family: inherit;
+        outline: none; transition: var(--transition); flex-shrink: 0;
+      }
+      .sort-pick:focus { border-color: var(--primary); }
+
+      /* List header */
+      .list-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+      .list-title  { font-size: 14px; font-weight: 800; color: var(--text); }
+      .list-count  { font-size: 11px; font-weight: 600; color: var(--muted); background: var(--bg); padding: 3px 9px; border-radius: 20px; }
+
+      /* Transaction card */
+      .tx-list { display: flex; flex-direction: column; gap: 10px; }
+      .tx-card {
+        display: flex; background: var(--card);
+        border-radius: 16px; box-shadow: var(--shadow);
+        overflow: hidden;
+        transition: transform var(--transition), box-shadow var(--transition);
+        animation: txIn 0.32s cubic-bezier(0.4,0,0.2,1) both;
+      }
+      @keyframes txIn {
+        from { opacity: 0; transform: translateY(12px) scale(0.98); }
+        to   { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      .tx-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+
+      .tx-stripe { width: 5px; flex-shrink: 0; background: var(--primary); }
+      .tx-stripe.due      { background: var(--due); }
+      .tx-stripe.debt     { background: var(--debt); }
+      .tx-stripe.paid     { background: var(--paid); }
+      .tx-stripe.sale     { background: var(--purple); }
+      .tx-stripe.purchase { background: var(--pink); }
+      .tx-stripe.other    { background: var(--gray-type); }
+
+      .tx-body { flex: 1; padding: 14px 14px 12px; min-width: 0; }
+
+      .tx-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
+      .tx-name-wrap { flex: 1; min-width: 0; }
+      .tx-name  { font-size: 15px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+      .tx-phone { font-size: 11px; color: var(--muted); font-weight: 600; }
+      .tx-amt-wrap { flex-shrink: 0; margin-left: 12px; text-align: right; }
+      .tx-amt {
+        font-family: 'Space Mono', monospace;
+        font-size: 16px; font-weight: 700; letter-spacing: -0.5px;
+      }
+      .tx-amt.c-danger  { color: var(--danger); }
+      .tx-amt.c-debt    { color: var(--debt); }
+      .tx-amt.c-paid    { color: var(--paid); }
+      .tx-amt.c-neutral { color: var(--text); }
+
+      .tx-tags { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
+      .tag {
+        padding: 3px 9px; border-radius: 30px;
+        font-size: 10px; font-weight: 700; letter-spacing: 0.2px;
+      }
+      .tag-pending  { background: #fefce8; color: #a16207; }
+      .tag-paid     { background: #f0fdf4; color: #166534; }
+      .tag-due      { background: #fff7ed; color: #c2410c; }
+      .tag-debt     { background: #eff6ff; color: #1d4ed8; }
+      .tag-sale     { background: #f5f3ff; color: #6d28d9; }
+      .tag-purchase { background: #fdf2f8; color: #9d174d; }
+      .tag-other    { background: #f9fafb; color: #374151; }
+      .tag-date     { background: var(--bg); color: var(--muted); border: 1.5px solid var(--border); }
+      .tag-overdue  {
+        background: #fef2f2; color: var(--danger);
+        border: 1.5px solid #fca5a5;
+        animation: overdueFlash 2.2s ease-in-out infinite;
+      }
+      @keyframes overdueFlash { 0%,100% { opacity: 1; } 50% { opacity: 0.65; } }
+
+      .tx-reason { font-size: 12px; color: var(--muted); font-style: italic; margin-bottom: 10px; }
+      .tx-actions { display: flex; gap: 6px; }
+      .tx-act {
+        flex: 1; padding: 7px 5px;
+        border-radius: 10px; border: none; cursor: pointer;
+        font-size: 11px; font-weight: 700; font-family: inherit;
+        transition: all var(--transition);
+        display: flex; align-items: center; justify-content: center; gap: 4px;
+      }
+      .act-mark  { background: #f0fdf4; color: #166534; }
+      .act-mark:hover  { background: #dcfce7; }
+      .act-edit  { background: #fff7ed; color: var(--primary); }
+      .act-edit:hover  { background: #fed7aa; }
+      .act-del   { background: #fef2f2; color: var(--danger); }
+      .act-del:hover   { background: #fee2e2; }
+
+      /* Empty state */
+      .empty {
+        text-align: center; padding: 64px 24px;
+        animation: fadeUp 0.45s ease;
+      }
+      @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+      .empty-ico  { font-size: 56px; margin-bottom: 14px; display: block; }
+      .empty-ttl  { font-size: 18px; font-weight: 800; color: var(--text); margin-bottom: 6px; }
+      .empty-sub  { font-size: 13px; color: var(--muted); }
+
+      /* ===== MODAL / BOTTOM SHEET ===== */
+      .sheet-bg {
+        position: fixed; inset: 0;
+        background: rgba(0,0,0,0);
+        z-index: 600;
+        display: flex; align-items: flex-end; justify-content: center;
+        pointer-events: none;
+        transition: background 0.32s ease;
+      }
+      .sheet-bg.open { background: rgba(0,0,0,0.52); pointer-events: all; backdrop-filter: blur(4px); }
+
+      .sheet {
+        width: 100%; max-width: 700px;
+        background: var(--card);
+        border-radius: 26px 26px 0 0;
+        padding: 0 0 48px;
+        max-height: 93vh; overflow-y: auto;
+        transform: translateY(100%);
+        transition: transform 0.42s cubic-bezier(0.32,0.72,0,1);
+        overscroll-behavior: contain;
+      }
+      .sheet-bg.open .sheet { transform: translateY(0); }
+
+      .sheet-pill  { width: 44px; height: 4px; background: var(--border); border-radius: 2px; margin: 14px auto 0; }
+      .sheet-head  { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px 4px; }
+      .sheet-title { font-size: 19px; font-weight: 800; color: var(--text); }
+      .sheet-close {
+        width: 34px; height: 34px; border-radius: 50%; border: none;
+        background: var(--bg); cursor: pointer; font-size: 16px;
+        display: flex; align-items: center; justify-content: center;
+        color: var(--muted); transition: all var(--transition);
+      }
+      .sheet-close:hover { background: #fee2e2; color: var(--danger); }
+
+      .sheet-body { padding: 14px 20px 0; }
+      .s-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      .s-group { margin-bottom: 13px; }
+      .s-label { font-size: 11px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; color: #444; margin-bottom: 7px; }
+      .s-input {
+        width: 100%; padding: 11px 14px;
+        border: 2px solid var(--border); border-radius: 12px;
+        font-size: 13px; font-family: inherit;
+        background: var(--bg); color: var(--text);
+        outline: none; transition: var(--transition);
+      }
+      .s-input:focus { border-color: var(--primary); background: white; box-shadow: 0 0 0 3px rgba(249,115,22,0.08); }
+      select.s-input { cursor: pointer; }
+
+      .sheet-foot { padding: 16px 20px 0; display: flex; gap: 10px; }
+      .btn-cancel-sheet {
+        flex: 1; padding: 13px; border-radius: 12px;
+        border: 2px solid var(--border); background: white;
+        font-size: 14px; font-weight: 700; font-family: inherit;
+        color: var(--muted); cursor: pointer; transition: var(--transition);
+      }
+      .btn-cancel-sheet:hover { border-color: var(--primary); color: var(--primary); }
+      .btn-save-sheet {
+        flex: 2; padding: 13px; border-radius: 12px; border: none;
+        background: linear-gradient(135deg, #F97316, #EA580C);
+        color: white; font-size: 14px; font-weight: 800; font-family: inherit;
+        cursor: pointer;
+        box-shadow: 0 4px 16px rgba(249,115,22,0.42);
+        transition: all var(--transition);
+      }
+      .btn-save-sheet:hover { transform: translateY(-1px); box-shadow: 0 6px 22px rgba(249,115,22,0.55); }
+      .btn-save-sheet.busy { opacity: 0.7; pointer-events: none; }
+
+      /* ===== DELETE CONFIRM ===== */
+      .confirm-bg {
+        position: fixed; inset: 0;
+        background: rgba(0,0,0,0.55);
+        z-index: 700;
+        display: flex; align-items: center; justify-content: center;
+        padding: 20px;
+        opacity: 0; pointer-events: none;
+        transition: opacity 0.25s ease;
+        backdrop-filter: blur(5px);
+      }
+      .confirm-bg.open { opacity: 1; pointer-events: all; }
+      .confirm-box {
+        background: white; border-radius: 22px;
+        padding: 30px 24px; max-width: 320px; width: 100%;
+        box-shadow: 0 24px 60px rgba(0,0,0,0.22);
+        transform: scale(0.88);
+        transition: transform 0.28s cubic-bezier(0.34,1.56,0.64,1);
+        text-align: center;
+      }
+      .confirm-bg.open .confirm-box { transform: scale(1); }
+      .confirm-ico  { font-size: 44px; margin-bottom: 14px; display: block; }
+      .confirm-ttl  { font-size: 17px; font-weight: 800; margin-bottom: 6px; }
+      .confirm-sub  { font-size: 13px; color: var(--muted); margin-bottom: 22px; }
+      .confirm-btns { display: flex; gap: 10px; }
+      .btn-no  { flex:1; padding:12px; border-radius:11px; border:2px solid var(--border); background:white; font-size:13px; font-weight:700; font-family:inherit; color:var(--muted); cursor:pointer; transition:var(--transition); }
+      .btn-no:hover { border-color: var(--primary); color: var(--primary); }
+      .btn-yes { flex:1; padding:12px; border-radius:11px; border:none; background:var(--danger); color:white; font-size:13px; font-weight:700; font-family:inherit; cursor:pointer; box-shadow:0 3px 12px rgba(239,68,68,0.38); transition:all var(--transition); }
+      .btn-yes:hover { background:#dc2626; transform:translateY(-1px); }
+
+      /* ===== RESPONSIVE ===== */
+      @media (max-width: 480px) {
+        .auth-card { padding: 28px 20px 28px; border-radius: 22px; }
+        .s-row { grid-template-columns: 1fr; }
+        .topbar-user-badge { display: none; }
+        .sum-amount { font-size: 13px; }
+        .btn-add-tx span.add-label { display: none; }
+      }
+
+      ::-webkit-scrollbar { width: 4px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: rgba(249,115,22,0.28); border-radius: 2px; }
+    </style>
+  </head>
+  <body>
+
+  <!-- GLOBAL LOADER -->
+  <div id="global-loader">
+    <div class="loader-inner">
+      <svg class="loader-logo" viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="llg" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#F97316"/>
+            <stop offset="100%" stop-color="#EA580C"/>
+          </linearGradient>
+        </defs>
+        <circle cx="36" cy="36" r="34" fill="url(#llg)"/>
+        <circle cx="36" cy="36" r="28" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"/>
+        <text x="36" y="45" text-anchor="middle" font-family="'Plus Jakarta Sans',sans-serif" font-weight="900" font-size="22" fill="white" letter-spacing="-1">MM</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- TOASTS -->
+  <div id="toast-stack"></div>
+
+  <!-- DELETE CONFIRM -->
+  <div class="confirm-bg" id="del-bg">
+    <div class="confirm-box">
+      <span class="confirm-ico">🗑️</span>
+      <div class="confirm-ttl">Delete this transaction?</div>
+      <div class="confirm-sub">This action is permanent and cannot be undone.</div>
+      <div class="confirm-btns">
+        <button class="btn-no"  onclick="closeConfirm()">Cancel</button>
+        <button class="btn-yes" id="del-yes-btn" onclick="doDelete()">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AUTH SECTION -->
+  <div id="auth-section">
+    <div class="auth-bubble auth-bubble-1"></div>
+    <div class="auth-bubble auth-bubble-2"></div>
+    <div class="auth-bubble auth-bubble-3"></div>
+
+    <div class="auth-card">
+      <!-- Logo -->
+      <div class="auth-logo-wrap">
+        <svg class="auth-logo-svg" viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="alg1" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#F97316"/>
+              <stop offset="100%" stop-color="#C2410C"/>
+            </linearGradient>
+            <radialGradient id="alg2" cx="30%" cy="30%" r="70%">
+              <stop offset="0%" stop-color="#FED7AA"/>
+              <stop offset="100%" stop-color="#FCA5A5"/>
+            </radialGradient>
+          </defs>
+          <!-- Main circle -->
+          <circle cx="36" cy="36" r="35" fill="url(#alg1)"/>
+          <!-- Subtle inner ring -->
+          <circle cx="36" cy="36" r="29" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="2"/>
+          <!-- MM text -->
+          <text x="36" y="46" text-anchor="middle" font-family="'Plus Jakarta Sans',Arial Black,sans-serif"
+                font-weight="900" font-size="23" fill="white" letter-spacing="-1.5">MM</text>
+          <!-- Coin accent -->
+          <circle cx="57" cy="55" r="11" fill="url(#alg2)" opacity="0.9"/>
+          <text x="57" y="59.5" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#C2410C" font-weight="700">$</text>
+        </svg>
+        <div class="auth-logo-name">Money Maestro</div>
+        <div class="auth-logo-tagline">Master Your Finances</div>
+      </div>
+
+      <!-- Slider -->
+      <div class="auth-slider">
+        <!-- Login -->
+        <div class="auth-panel current" id="pnl-login">
+          <div class="auth-heading">Welcome back 👋</div>
+          <div class="auth-sub">Sign in to manage your transactions</div>
+          <div class="auth-err" id="login-err"></div>
+          <div class="field-group">
+            <label class="field-label">Email Address</label>
+            <input type="email" id="li-email" class="field-input" placeholder="you@example.com" autocomplete="email"/>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Password</label>
+            <div class="pw-wrapper">
+              <input type="password" id="li-pass" class="field-input" placeholder="••••••••" autocomplete="current-password"/>
+              <button class="pw-eye" type="button" onclick="togglePw('li-pass',this)">👁</button>
+            </div>
+          </div>
+          <button class="btn-auth" id="li-btn" onclick="doLogin()">Sign In</button>
+          <div class="auth-switch">No account? <a onclick="goRegister()">Create one free</a></div>
+        </div>
+
+        <!-- Register -->
+        <div class="auth-panel slide-right" id="pnl-reg">
+          <div class="auth-heading">Create Account ✨</div>
+          <div class="auth-sub">Free forever — no credit card needed</div>
+          <div class="auth-err" id="reg-err"></div>
+          <div class="field-group">
+            <label class="field-label">Email Address</label>
+            <input type="email" id="rg-email" class="field-input" placeholder="you@example.com" autocomplete="email"/>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Password</label>
+            <div class="pw-wrapper">
+              <input type="password" id="rg-pass" class="field-input" placeholder="Min. 6 characters" autocomplete="new-password"/>
+              <button class="pw-eye" type="button" onclick="togglePw('rg-pass',this)">👁</button>
+            </div>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Confirm Password</label>
+            <div class="pw-wrapper">
+              <input type="password" id="rg-conf" class="field-input" placeholder="Re-enter password" autocomplete="new-password"/>
+              <button class="pw-eye" type="button" onclick="togglePw('rg-conf',this)">👁</button>
+            </div>
+          </div>
+          <button class="btn-auth" id="rg-btn" onclick="doRegister()">Create Account</button>
+          <div class="auth-switch">Already have one? <a onclick="goLogin()">Sign in</a></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- APP SECTION -->
+  <div id="app-section">
+    <!-- Topbar -->
+    <div class="topbar">
+      <div class="topbar-inner">
+        <div class="topbar-brand">
+          <div class="topbar-mm">MM</div>
+          <span class="topbar-name">Money Maestro</span>
+        </div>
+        <div class="topbar-right">
+          <span class="topbar-user-badge" id="tb-user"></span>
+          <select class="currency-pick" id="cur-pick" onchange="setCurrency(this.value)">
+            <option value="৳">৳ BDT</option>
+            <option value="$">$ USD</option>
+            <option value="€">€ EUR</option>
+            <option value="£">£ GBP</option>
+            <option value="₹">₹ INR</option>
+            <option value="¥">¥ JPY</option>
+            <option value="₩">₩ KRW</option>
+            <option value="₺">₺ TRY</option>
+            <option value="₴">₴ UAH</option>
+            <option value="R$">R$ BRL</option>
+            <option value="₦">₦ NGN</option>
+            <option value="AED">AED</option>
+          </select>
+          <button class="btn-signout" onclick="doLogout()">Sign Out</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main -->
+    <div class="main">
+
+      <!-- Summary Cards -->
+      <div class="summary-grid">
+        <div class="sum-card" data-emoji="📊">
+          <div class="sum-icon">📊</div>
+          <div class="sum-label">Total Transactions</div>
+          <div class="sum-amount" id="s-total">—</div>
+          <div class="sum-sub" id="s-total-c">—</div>
+        </div>
+        <div class="sum-card" data-color="due" data-emoji="🔴">
+          <div class="sum-icon">🔴</div>
+          <div class="sum-label">Total Due</div>
+          <div class="sum-amount" id="s-due">—</div>
+          <div class="sum-sub" id="s-due-c">—</div>
+        </div>
+        <div class="sum-card" data-color="debt" data-emoji="🔵">
+          <div class="sum-icon">🔵</div>
+          <div class="sum-label">Total Debt</div>
+          <div class="sum-amount" id="s-debt">—</div>
+          <div class="sum-sub" id="s-debt-c">—</div>
+        </div>
+        <div class="sum-card" data-color="paid" data-emoji="✅">
+          <div class="sum-icon">✅</div>
+          <div class="sum-label">Total Paid</div>
+          <div class="sum-amount" id="s-paid">—</div>
+          <div class="sum-sub" id="s-paid-c">—</div>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="controls">
+        <div class="controls-row1">
+          <button class="btn-add-tx" onclick="openSheet()">
+            <span style="font-size:17px;line-height:1">+</span>
+            <span class="add-label">Add Transaction</span>
+          </button>
+          <input type="search" class="search-box" id="search" placeholder="🔍  Search name or note…" oninput="applyFilters()"/>
+        </div>
+        <div class="controls-row2">
+          <div class="filter-row" id="filter-row">
+            <button class="f-chip on" data-f="All"     onclick="pickFilter('All',this)">All</button>
+            <button class="f-chip"    data-f="Due"     onclick="pickFilter('Due',this)">Due</button>
+            <button class="f-chip"    data-f="Debt"    onclick="pickFilter('Debt',this)">Debt</button>
+            <button class="f-chip"    data-f="Paid"    onclick="pickFilter('Paid',this)">Paid</button>
+            <button class="f-chip"    data-f="Overdue" onclick="pickFilter('Overdue',this)">⚠ Overdue</button>
+          </div>
+          <select class="sort-pick" id="sort" onchange="applyFilters()">
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
+            <option value="amt-d">Amount ↓</option>
+            <option value="amt-a">Amount ↑</option>
+            <option value="az">Name A–Z</option>
+            <option value="due-soon">Due Soon</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- List -->
+      <div class="list-header">
+        <span class="list-title">Transactions</span>
+        <span class="list-count" id="list-count"></span>
+      </div>
+      <div class="tx-list" id="tx-list">
+        <div class="empty"><span class="empty-ico">⏳</span><div class="empty-ttl">Loading…</div></div>
+      </div>
+
+    </div><!-- /main -->
+  </div><!-- /app-section -->
+
+  <!-- BOTTOM SHEET MODAL -->
+  <div class="sheet-bg" id="sheet-bg" onclick="bgClick(event)">
+    <div class="sheet" id="sheet">
+      <div class="sheet-pill"></div>
+      <div class="sheet-head">
+        <div class="sheet-title" id="sheet-ttl">Add Transaction</div>
+        <button class="sheet-close" onclick="closeSheet()">✕</button>
+      </div>
+      <div class="sheet-body">
+        <input type="hidden" id="f-id"/>
+        <div class="s-row">
+          <div class="s-group">
+            <div class="s-label">Name *</div>
+            <input type="text" id="f-name" class="s-input" placeholder="Person or entity"/>
+          </div>
+          <div class="s-group">
+            <div class="s-label">Amount *</div>
+            <input type="number" id="f-amt" class="s-input" placeholder="0.00" min="0" step="0.01"/>
+          </div>
+        </div>
+        <div class="s-row">
+          <div class="s-group">
+            <div class="s-label">Phone</div>
+            <input type="text" id="f-phone" class="s-input" placeholder="+1 234 567 8900"/>
+          </div>
+          <div class="s-group">
+            <div class="s-label">Type *</div>
+            <select id="f-type" class="s-input">
+              <option value="Due">Due (they owe me)</option>
+              <option value="Debt">Debt (I owe them)</option>
+              <option value="Sale">Sale</option>
+              <option value="Purchase">Purchase</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="s-row">
+          <div class="s-group">
+            <div class="s-label">Given Date</div>
+            <input type="date" id="f-gdate" class="s-input"/>
+          </div>
+          <div class="s-group">
+            <div class="s-label">Due Date</div>
+            <input type="date" id="f-ddate" class="s-input"/>
+          </div>
+        </div>
+        <div class="s-row">
+          <div class="s-group">
+            <div class="s-label">Status</div>
+            <select id="f-status" class="s-input">
+              <option value="Pending">Pending</option>
+              <option value="Paid">Paid</option>
+            </select>
+          </div>
+          <div class="s-group">
+            <div class="s-label">Reason / Note</div>
+            <input type="text" id="f-reason" class="s-input" placeholder="Optional…"/>
+          </div>
+        </div>
+      </div>
+      <div class="sheet-foot">
+        <button class="btn-cancel-sheet" onclick="closeSheet()">Cancel</button>
+        <button class="btn-save-sheet" id="save-btn" onclick="saveTx()">Save Transaction</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  // ── CONFIG ──────────────────────────────────────────────
+  const SB_URL = 'https://xrchfqafpqfvjdqbibfw.supabase.co';
+  const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhyY2hmcWFmcHFmdmpkcWJpYmZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MTI3NTgsImV4cCI6MjA5NjQ4ODc1OH0.SleUjndCJ0SWT1n7UjGFe7TWGnAzRlx0t5wB-XlBP6Y';
+  const sb = window.supabase.createClient(SB_URL, SB_KEY);
+
+  // ── STATE ────────────────────────────────────────────────
+  let session   = null;
+  let txAll     = [];
+  let curFilter = 'All';
+  let curSym    = '৳';
+  let delTarget = null;
+
+  // ── BOOT ─────────────────────────────────────────────────
+  (async () => {
+    const savedSym = localStorage.getItem('mm_sym');
+    if (savedSym) {
+      curSym = savedSym;
+      const pick = document.getElementById('cur-pick');
+      [...pick.options].forEach(o => { if (o.value === savedSym) o.selected = true; });
+    }
+
+    const { data: { session: s } } = await sb.auth.getSession();
+    hideLoader();
+    if (s) { session = s; showApp(); await loadTx(); }
+    else   { showAuth(); }
+
+    sb.auth.onAuthStateChange((_e, s) => {
+      if (s && !session) { session = s; showApp(); loadTx(); }
+      else if (!s)       { session = null; showAuth(); }
+    });
+  })();
+
+  function hideLoader() {
+    document.getElementById('global-loader').classList.add('hidden');
+  }
+
+  // ── AUTH SLIDES ──────────────────────────────────────────
+  function goRegister() {
+    document.getElementById('pnl-login').className = 'auth-panel slide-left';
+    document.getElementById('pnl-reg').className   = 'auth-panel current';
+    clearAuthErrs();
+  }
+  function goLogin() {
+    document.getElementById('pnl-reg').className   = 'auth-panel slide-right';
+    document.getElementById('pnl-login').className = 'auth-panel current';
+    clearAuthErrs();
+  }
+  function clearAuthErrs() {
+    ['login-err','reg-err'].forEach(id => {
+      const el = document.getElementById(id);
+      el.className = 'auth-err'; el.textContent = '';
+    });
+  }
+  function showAuthErr(id, msg) {
+    const el = document.getElementById(id);
+    el.textContent = msg; el.className = 'auth-err show';
+  }
+  function togglePw(id, btn) {
+    const inp = document.getElementById(id);
+    inp.type = inp.type === 'password' ? 'text' : 'password';
+    btn.textContent = inp.type === 'text' ? '🙈' : '👁';
+  }
+
+  // ── AUTH ACTIONS ─────────────────────────────────────────
+  async function doLogin() {
+    const email = document.getElementById('li-email').value.trim();
+    const pass  = document.getElementById('li-pass').value;
+    if (!email || !pass) return showAuthErr('login-err', 'Please fill in all fields.');
+    const btn = document.getElementById('li-btn');
+    btn.textContent = 'Signing in…'; btn.classList.add('busy');
+    const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+    btn.textContent = 'Sign In'; btn.classList.remove('busy');
+    if (error) showAuthErr('login-err', error.message);
+  }
+
+  async function doRegister() {
+    const email = document.getElementById('rg-email').value.trim();
+    const pass  = document.getElementById('rg-pass').value;
+    const conf  = document.getElementById('rg-conf').value;
+    if (!email || !pass || !conf) return showAuthErr('reg-err', 'Please fill in all fields.');
+    if (pass !== conf) return showAuthErr('reg-err', 'Passwords do not match.');
+    if (pass.length < 6) return showAuthErr('reg-err', 'Password must be at least 6 characters.');
+    const btn = document.getElementById('rg-btn');
+    btn.textContent = 'Creating…'; btn.classList.add('busy');
+    const { error } = await sb.auth.signUp({ email, password: pass });
+    btn.textContent = 'Create Account'; btn.classList.remove('busy');
+    if (error) return showAuthErr('reg-err', error.message);
+    toast('Account created! Please sign in.', 'success');
+    goLogin();
+    document.getElementById('li-email').value = email;
+  }
+
+  async function doLogout() {
+    await sb.auth.signOut();
+    txAll = []; session = null;
+    toast('Signed out', 'info');
+  }
+
+  // ── PAGE SWITCH ──────────────────────────────────────────
+  function showAuth() {
+    document.getElementById('auth-section').classList.add('visible');
+    document.getElementById('app-section').classList.remove('visible');
+    document.getElementById('pnl-login').className = 'auth-panel current';
+    document.getElementById('pnl-reg').className   = 'auth-panel slide-right';
+  }
+  function showApp() {
+    document.getElementById('auth-section').classList.remove('visible');
+    document.getElementById('app-section').classList.add('visible');
+    if (session) {
+      const user = session.user.email || '';
+      document.getElementById('tb-user').textContent = user.split('@')[0];
+    }
+  }
+
+  // ── CURRENCY ─────────────────────────────────────────────
+  function setCurrency(sym) {
+    curSym = sym;
+    localStorage.setItem('mm_sym', sym);
+    applyFilters();
+    refreshSummary();
+  }
+  function fmt(n) {
+    const v = parseFloat(n) || 0;
+    return curSym + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  // ── LOAD DATA ─────────────────────────────────────────────
+  async function loadTx() {
+    const { data, error } = await sb.from('transactions').select('*').order('created_at', { ascending: false });
+    if (error) { toast('Failed to load: ' + error.message, 'error'); return; }
+    txAll = data || [];
+    applyFilters();
+    refreshSummary();
+  }
+
+  // ── SUMMARY ───────────────────────────────────────────────
+  function refreshSummary() {
+    const total = txAll.reduce((s,t) => s + (parseFloat(t.amount)||0), 0);
+    const due   = txAll.filter(t => t.type==='Due'  && t.status==='Pending').reduce((s,t) => s+(parseFloat(t.amount)||0), 0);
+    const debt  = txAll.filter(t => t.type==='Debt' && t.status==='Pending').reduce((s,t) => s+(parseFloat(t.amount)||0), 0);
+    const paid  = txAll.filter(t => t.status==='Paid').reduce((s,t) => s+(parseFloat(t.amount)||0), 0);
+
+    const cDue  = txAll.filter(t => t.type==='Due'  && t.status==='Pending').length;
+    const cDebt = txAll.filter(t => t.type==='Debt' && t.status==='Pending').length;
+    const cPaid = txAll.filter(t => t.status==='Paid').length;
+
+    document.getElementById('s-total').textContent  = fmt(total);
+    document.getElementById('s-total-c').textContent = `${txAll.length} transaction${txAll.length!==1?'s':''}`;
+    document.getElementById('s-due').textContent    = fmt(due);
+    document.getElementById('s-due-c').textContent  = `${cDue} pending`;
+    document.getElementById('s-debt').textContent   = fmt(debt);
+    document.getElementById('s-debt-c').textContent = `${cDebt} pending`;
+    document.getElementById('s-paid').textContent   = fmt(paid);
+    document.getElementById('s-paid-c').textContent = `${cPaid} settled`;
+  }
+
+  // ── FILTER / SORT ─────────────────────────────────────────
+  function pickFilter(f, btn) {
+    curFilter = f;
+    document.querySelectorAll('.f-chip').forEach(c => c.classList.remove('on'));
+    btn.classList.add('on');
+    applyFilters();
+  }
+
+  function isOverdue(t) {
+    if (t.status === 'Paid' || !t.due_date) return false;
+    return new Date(t.due_date + 'T23:59:59') < new Date();
+  }
+
+  function getVisible() {
+    const q = (document.getElementById('search')?.value || '').toLowerCase();
+    const s = document.getElementById('sort')?.value || 'newest';
+    let list = [...txAll];
+    if (q) list = list.filter(t => (t.name||'').toLowerCase().includes(q) || (t.reason||'').toLowerCase().includes(q));
+    if (curFilter==='Due')     list = list.filter(t => t.type==='Due'  && t.status==='Pending');
+    else if (curFilter==='Debt')    list = list.filter(t => t.type==='Debt' && t.status==='Pending');
+    else if (curFilter==='Paid')    list = list.filter(t => t.status==='Paid');
+    else if (curFilter==='Overdue') list = list.filter(t => isOverdue(t));
+    if (s==='newest')   list.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+    else if (s==='oldest')   list.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+    else if (s==='amt-d')    list.sort((a,b)=>(parseFloat(b.amount)||0)-(parseFloat(a.amount)||0));
+    else if (s==='amt-a')    list.sort((a,b)=>(parseFloat(a.amount)||0)-(parseFloat(b.amount)||0));
+    else if (s==='az')       list.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+    else if (s==='due-soon') list.sort((a,b)=>{ if(!a.due_date)return 1;if(!b.due_date)return -1;return new Date(a.due_date)-new Date(b.due_date); });
+    return list;
+  }
+
+  function applyFilters() { render(getVisible()); }
+
+  // ── RENDER ────────────────────────────────────────────────
+  function fmtDate(d) {
+    if (!d) return null;
+    const dt = new Date(d + 'T00:00:00');
+    return `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`;
+  }
+
+  function stripeCls(t) {
+    if (t.status==='Paid')  return 'paid';
+    if (t.type==='Due')     return 'due';
+    if (t.type==='Debt')    return 'debt';
+    if (t.type==='Sale')    return 'sale';
+    if (t.type==='Purchase')return 'purchase';
+    return 'other';
+  }
+
+  function amtCls(t) {
+    if (t.status==='Paid')  return 'c-paid';
+    if (t.type==='Due')     return 'c-danger';
+    if (t.type==='Debt')    return 'c-debt';
+    return 'c-neutral';
+  }
+
+  function typeCls(type) {
+    const m = {Due:'tag-due',Debt:'tag-debt',Sale:'tag-sale',Purchase:'tag-purchase',Other:'tag-other'};
+    return m[type] || 'tag-other';
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function render(list) {
+    document.getElementById('list-count').textContent = `${list.length} record${list.length!==1?'s':''}`;
+    const el = document.getElementById('tx-list');
+    if (!list.length) {
+      el.innerHTML = `<div class="empty">
+        <span class="empty-ico">💸</span>
+        <div class="empty-ttl">No transactions found</div>
+        <div class="empty-sub">Tap "+ Add Transaction" to record one</div>
+      </div>`;
+      return;
+    }
+
+    el.innerHTML = list.map((t, i) => {
+      const od = isOverdue(t);
+      const tags = [
+        `<span class="tag tag-${t.status.toLowerCase()}">${t.status}</span>`,
+        `<span class="tag ${typeCls(t.type)}">${t.type}</span>`,
+        t.given_date ? `<span class="tag tag-date">📅 ${fmtDate(t.given_date)}</span>` : '',
+        t.due_date   ? `<span class="tag tag-date">⏰ ${fmtDate(t.due_date)}</span>` : '',
+        od           ? `<span class="tag tag-overdue">⚠️ OVERDUE</span>` : '',
+      ].join('');
+
+      const markBtn = t.status !== 'Paid'
+        ? `<button class="tx-act act-mark" onclick="markPaid('${t.id}')">✓ Paid</button>` : '';
+
+      return `<div class="tx-card" style="animation-delay:${Math.min(i*0.05,0.28)}s">
+        <div class="tx-stripe ${stripeCls(t)}"></div>
+        <div class="tx-body">
+          <div class="tx-head">
+            <div class="tx-name-wrap">
+              <div class="tx-name">${esc(t.name||'—')}</div>
+              ${t.phone?`<div class="tx-phone">${esc(t.phone)}</div>`:''}
+            </div>
+            <div class="tx-amt-wrap">
+              <div class="tx-amt ${amtCls(t)}">${fmt(t.amount)}</div>
+            </div>
+          </div>
+          <div class="tx-tags">${tags}</div>
+          ${t.reason?`<div class="tx-reason">"${esc(t.reason)}"</div>`:''}
+          <div class="tx-actions">
+            ${markBtn}
+            <button class="tx-act act-edit" onclick="openEdit('${t.id}')">✏️ Edit</button>
+            <button class="tx-act act-del"  onclick="askDelete('${t.id}')">🗑 Delete</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── SHEET MODAL ───────────────────────────────────────────
+  function today() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+
+  function openSheet(data) {
+    document.getElementById('sheet-ttl').textContent = data ? 'Edit Transaction' : 'Add Transaction';
+    document.getElementById('f-id').value      = data?.id || '';
+    document.getElementById('f-name').value    = data?.name || '';
+    document.getElementById('f-amt').value     = data?.amount || '';
+    document.getElementById('f-phone').value   = data?.phone || '';
+    document.getElementById('f-type').value    = data?.type || 'Due';
+    document.getElementById('f-gdate').value   = data?.given_date || today();
+    document.getElementById('f-ddate').value   = data?.due_date || '';
+    document.getElementById('f-status').value  = data?.status || 'Pending';
+    document.getElementById('f-reason').value  = data?.reason || '';
+    document.getElementById('sheet-bg').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => document.getElementById('f-name').focus(), 420);
+  }
+
+  function closeSheet() {
+    document.getElementById('sheet-bg').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  function bgClick(e) {
+    if (e.target === document.getElementById('sheet-bg')) closeSheet();
+  }
+
+  function openEdit(id) {
+    const t = txAll.find(x => x.id === id);
+    if (t) openSheet(t);
+  }
+
+  // ── SAVE ─────────────────────────────────────────────────
+  async function saveTx() {
+    const name = document.getElementById('f-name').value.trim();
+    const amt  = parseFloat(document.getElementById('f-amt').value);
+    if (!name)     return toast('Name is required', 'error');
+    if (!amt||amt<=0) return toast('Enter a valid amount', 'error');
+
+    const btn = document.getElementById('save-btn');
+    btn.textContent = 'Saving…'; btn.classList.add('busy');
+
+    const payload = {
+      name,
+      amount: amt,
+      phone:      document.getElementById('f-phone').value.trim() || null,
+      type:       document.getElementById('f-type').value,
+      given_date: document.getElementById('f-gdate').value || null,
+      due_date:   document.getElementById('f-ddate').value || null,
+      status:     document.getElementById('f-status').value,
+      reason:     document.getElementById('f-reason').value.trim() || null,
+    };
+
+    const id = document.getElementById('f-id').value;
+    let err;
+    if (id) {
+      ({ error: err } = await sb.from('transactions').update(payload).eq('id', id));
+    } else {
+      ({ error: err } = await sb.from('transactions').insert({ ...payload, user_id: session.user.id }));
+    }
+
+    btn.textContent = 'Save Transaction'; btn.classList.remove('busy');
+    if (err) return toast('Error: ' + err.message, 'error');
+
+    closeSheet();
+    toast(id ? 'Transaction updated ✅' : 'Transaction added ✅', 'success');
+    await loadTx();
+  }
+
+  // ── MARK PAID ─────────────────────────────────────────────
+  async function markPaid(id) {
+    const { error } = await sb.from('transactions').update({ status: 'Paid' }).eq('id', id);
+    if (error) return toast('Update failed: ' + error.message, 'error');
+    toast('Marked as paid! 🎉', 'success');
+    await loadTx();
+  }
+
+  // ── DELETE ────────────────────────────────────────────────
+  function askDelete(id) {
+    delTarget = id;
+    document.getElementById('del-bg').classList.add('open');
+  }
+  function closeConfirm() {
+    delTarget = null;
+    document.getElementById('del-bg').classList.remove('open');
+  }
+  async function doDelete() {
+    if (!delTarget) return;
+    const { error } = await sb.from('transactions').delete().eq('id', delTarget);
+    closeConfirm();
+    if (error) return toast('Delete failed: ' + error.message, 'error');
+    toast('Deleted', 'info');
+    await loadTx();
+  }
+
+  // ── TOAST ─────────────────────────────────────────────────
+  function toast(msg, type='info') {
+    const c = document.getElementById('toast-stack');
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    const ico = { success:'✅', error:'❌', info:'ℹ️' };
+    el.innerHTML = `<span>${ico[type]||'ℹ️'}</span> ${msg}`;
+    c.appendChild(el);
+    setTimeout(() => {
+      el.style.transition = 'all 0.3s ease';
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(10px) scale(0.95)';
+      setTimeout(() => el.remove(), 300);
+    }, 3500);
+  }
+
+  // ── KEYBOARD ─────────────────────────────────────────────
+  document.addEventListener('keydown', e => {
+    if (e.key==='Escape') { closeSheet(); closeConfirm(); }
+    if (e.key==='Enter') {
+      if (document.getElementById('sheet-bg').classList.contains('open')) { e.preventDefault(); saveTx(); return; }
+      const auth = document.getElementById('auth-section');
+      if (auth.classList.contains('visible')) {
+        const loginActive = document.getElementById('pnl-login').classList.contains('current');
+        if (loginActive) doLogin(); else doRegister();
+      }
+    }
+  });
+  </script>
+  </body>
+</html>
