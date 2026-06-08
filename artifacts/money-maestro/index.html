@@ -13,6 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
       *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -552,6 +553,109 @@
       ::-webkit-scrollbar { width: 4px; }
       ::-webkit-scrollbar-track { background: transparent; }
       ::-webkit-scrollbar-thumb { background: rgba(249,115,22,0.28); border-radius: 2px; }
+
+      /* ===== VIEW TABS ===== */
+      .view-tabs {
+        display: flex; gap: 4px;
+        background: var(--card); border-radius: 18px;
+        padding: 6px; box-shadow: var(--shadow);
+        margin-bottom: 16px;
+      }
+      .view-tab {
+        flex: 1; padding: 10px 16px; border-radius: 13px; border: none;
+        font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer;
+        transition: all var(--transition); background: transparent; color: var(--muted);
+        display: flex; align-items: center; justify-content: center; gap: 6px;
+      }
+      .view-tab.on {
+        background: linear-gradient(135deg, #F97316, #EA580C);
+        color: white;
+        box-shadow: 0 3px 12px rgba(249,115,22,0.35);
+      }
+      .view-tab:not(.on):hover { background: var(--bg); color: var(--text); }
+
+      /* ===== PROGRESS BAR ===== */
+      .partial-wrap { margin-bottom: 10px; }
+      .partial-label {
+        display: flex; justify-content: space-between; align-items: center;
+        font-size: 11px; font-weight: 700; margin-bottom: 5px;
+      }
+      .partial-label-left { color: var(--muted); }
+      .partial-label-right { color: var(--text); font-family: 'Space Mono', monospace; }
+      .progress-track {
+        width: 100%; height: 7px; background: #F0E9E0;
+        border-radius: 10px; overflow: hidden;
+      }
+      .progress-fill {
+        height: 100%; border-radius: 10px;
+        background: linear-gradient(90deg, #22C55E, #16A34A);
+        transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
+        position: relative; overflow: hidden;
+      }
+      .progress-fill::after {
+        content: '';
+        position: absolute; top: 0; left: -100%; right: 0; bottom: 0;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+        animation: progressShine 2s ease-in-out infinite;
+      }
+      @keyframes progressShine {
+        from { left: -100%; }
+        to   { left: 200%; }
+      }
+      .remaining-badge {
+        display: inline-block; font-size: 10px; font-weight: 700;
+        background: #FEF2F2; color: var(--danger); padding: 2px 8px;
+        border-radius: 30px; border: 1.5px solid #FCA5A5; margin-top: 4px;
+        font-family: 'Space Mono', monospace;
+      }
+
+      /* ===== ANALYTICS SECTION ===== */
+      #analytics-view { display: none; }
+      #analytics-view.visible { display: block; }
+      #txns-view { display: block; }
+      #txns-view.hidden { display: none; }
+
+      .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+      .chart-card {
+        background: var(--card); border-radius: 18px;
+        padding: 18px; box-shadow: var(--shadow);
+        transition: transform var(--transition), box-shadow var(--transition);
+      }
+      .chart-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+      .chart-card.full { grid-column: 1 / -1; }
+      .chart-title {
+        font-size: 13px; font-weight: 800; color: var(--text);
+        margin-bottom: 14px; display: flex; align-items: center; gap: 6px;
+      }
+      .chart-canvas-wrap { position: relative; width: 100%; }
+
+      .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+      .stat-mini {
+        background: var(--card); border-radius: 14px; padding: 14px 12px;
+        box-shadow: var(--shadow); text-align: center;
+        border-bottom: 3px solid var(--primary);
+      }
+      .stat-mini:nth-child(2) { border-bottom-color: var(--debt); }
+      .stat-mini:nth-child(3) { border-bottom-color: var(--paid); }
+      .stat-mini-val { font-family: 'Space Mono', monospace; font-size: 16px; font-weight: 700; color: var(--text); }
+      .stat-mini-lbl { font-size: 10px; font-weight: 700; color: var(--muted); letter-spacing: 0.8px; text-transform: uppercase; margin-top: 4px; }
+
+      .insight-list { display: flex; flex-direction: column; gap: 8px; }
+      .insight-item {
+        display: flex; align-items: center; gap: 10px;
+        background: var(--bg); border-radius: 12px; padding: 11px 13px;
+      }
+      .insight-ico { font-size: 18px; flex-shrink: 0; }
+      .insight-text { font-size: 12px; color: var(--text); font-weight: 600; }
+      .insight-text strong { color: var(--primary); }
+
+      @media (max-width: 480px) {
+        .chart-grid { grid-template-columns: 1fr; }
+        .stats-row { grid-template-columns: 1fr 1fr; }
+      }
+
+      /* ===== NOTES TEXTAREA ===== */
+      textarea.s-input { resize: vertical; min-height: 72px; line-height: 1.5; }
     </style>
   </head>
   <body>
@@ -765,13 +869,77 @@
         </div>
       </div>
 
-      <!-- List -->
-      <div class="list-header">
-        <span class="list-title">Transactions</span>
-        <span class="list-count" id="list-count"></span>
+      <!-- View Tabs -->
+      <div class="view-tabs">
+        <button class="view-tab on" id="tab-txns" onclick="switchView('txns')">📋 Transactions</button>
+        <button class="view-tab" id="tab-analytics" onclick="switchView('analytics')">📈 Analytics</button>
       </div>
-      <div class="tx-list" id="tx-list">
-        <div class="empty"><span class="empty-ico">⏳</span><div class="empty-ttl">Loading…</div></div>
+
+      <!-- TRANSACTIONS VIEW -->
+      <div id="txns-view">
+        <!-- List -->
+        <div class="list-header">
+          <span class="list-title">Transactions</span>
+          <span class="list-count" id="list-count"></span>
+        </div>
+        <div class="tx-list" id="tx-list">
+          <div class="empty"><span class="empty-ico">⏳</span><div class="empty-ttl">Loading…</div></div>
+        </div>
+      </div>
+
+      <!-- ANALYTICS VIEW -->
+      <div id="analytics-view">
+        <!-- Quick stats -->
+        <div class="stats-row">
+          <div class="stat-mini">
+            <div class="stat-mini-val" id="an-overdue-cnt">0</div>
+            <div class="stat-mini-lbl">Overdue</div>
+          </div>
+          <div class="stat-mini">
+            <div class="stat-mini-val" id="an-partial-cnt">0</div>
+            <div class="stat-mini-lbl">Partial</div>
+          </div>
+          <div class="stat-mini">
+            <div class="stat-mini-val" id="an-paid-rate">0%</div>
+            <div class="stat-mini-lbl">Paid Rate</div>
+          </div>
+        </div>
+
+        <!-- Charts grid -->
+        <div class="chart-grid">
+          <div class="chart-card">
+            <div class="chart-title">🍕 By Type</div>
+            <div class="chart-canvas-wrap" style="height:180px">
+              <canvas id="chart-type"></canvas>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">✅ Status Split</div>
+            <div class="chart-canvas-wrap" style="height:180px">
+              <canvas id="chart-status"></canvas>
+            </div>
+          </div>
+          <div class="chart-card full">
+            <div class="chart-title">📅 Transactions Over Time</div>
+            <div class="chart-canvas-wrap" style="height:200px">
+              <canvas id="chart-timeline"></canvas>
+            </div>
+          </div>
+          <div class="chart-card full">
+            <div class="chart-title">💰 Due vs Debt vs Paid (Net)</div>
+            <div class="chart-canvas-wrap" style="height:180px">
+              <canvas id="chart-net"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Insights -->
+        <div class="chart-card" style="margin-bottom:16px">
+          <div class="chart-title">💡 Smart Insights</div>
+          <div class="insight-list" id="insight-list">
+            <div class="insight-item"><span class="insight-ico">⏳</span><span class="insight-text">Loading insights…</span></div>
+          </div>
+        </div>
       </div>
 
     </div><!-- /main -->
@@ -799,12 +967,12 @@
         </div>
         <div class="s-row">
           <div class="s-group">
-            <div class="s-label">Phone</div>
+            <div class="s-label" id="phone-label">Phone</div>
             <input type="text" id="f-phone" class="s-input" placeholder="+1 234 567 8900"/>
           </div>
           <div class="s-group">
             <div class="s-label">Type *</div>
-            <select id="f-type" class="s-input">
+            <select id="f-type" class="s-input" onchange="onTypeChange(this.value)">
               <option value="Due">Due (they owe me)</option>
               <option value="Debt">Debt (I owe them)</option>
               <option value="Sale">Sale</option>
@@ -832,9 +1000,17 @@
             </select>
           </div>
           <div class="s-group">
-            <div class="s-label">Reason / Note</div>
-            <input type="text" id="f-reason" class="s-input" placeholder="Optional…"/>
+            <div class="s-label">Partial Amount Paid</div>
+            <input type="number" id="f-partial" class="s-input" placeholder="0.00 (optional)" min="0" step="0.01"/>
           </div>
+        </div>
+        <div class="s-group">
+          <div class="s-label">Reason / Short Note</div>
+          <input type="text" id="f-reason" class="s-input" placeholder="Brief reason…"/>
+        </div>
+        <div class="s-group">
+          <div class="s-label">Notes (Details)</div>
+          <textarea id="f-notes" class="s-input" rows="3" placeholder="Additional details, agreements, context…"></textarea>
         </div>
       </div>
       <div class="sheet-foot">
@@ -983,22 +1159,24 @@
   // ── SUMMARY ───────────────────────────────────────────────
   function refreshSummary() {
     const total = txAll.reduce((s,t) => s + (parseFloat(t.amount)||0), 0);
-    const due   = txAll.filter(t => t.type==='Due'  && t.status==='Pending').reduce((s,t) => s+(parseFloat(t.amount)||0), 0);
-    const debt  = txAll.filter(t => t.type==='Debt' && t.status==='Pending').reduce((s,t) => s+(parseFloat(t.amount)||0), 0);
-    const paid  = txAll.filter(t => t.status==='Paid').reduce((s,t) => s+(parseFloat(t.amount)||0), 0);
 
-    const cDue  = txAll.filter(t => t.type==='Due'  && t.status==='Pending').length;
-    const cDebt = txAll.filter(t => t.type==='Debt' && t.status==='Pending').length;
-    const cPaid = txAll.filter(t => t.status==='Paid').length;
+    // Due: subtract partial_paid from each pending Due
+    const dueItems  = txAll.filter(t => t.type==='Due'  && t.status==='Pending');
+    const debtItems = txAll.filter(t => t.type==='Debt' && t.status==='Pending');
+    const paidItems = txAll.filter(t => t.status==='Paid');
 
-    document.getElementById('s-total').textContent  = fmt(total);
+    const due  = dueItems.reduce((s,t)  => s + Math.max(0,(parseFloat(t.amount)||0)-(parseFloat(t.partial_paid)||0)), 0);
+    const debt = debtItems.reduce((s,t) => s + Math.max(0,(parseFloat(t.amount)||0)-(parseFloat(t.partial_paid)||0)), 0);
+    const paid = paidItems.reduce((s,t) => s + (parseFloat(t.amount)||0), 0);
+
+    document.getElementById('s-total').textContent   = fmt(total);
     document.getElementById('s-total-c').textContent = `${txAll.length} transaction${txAll.length!==1?'s':''}`;
-    document.getElementById('s-due').textContent    = fmt(due);
-    document.getElementById('s-due-c').textContent  = `${cDue} pending`;
-    document.getElementById('s-debt').textContent   = fmt(debt);
-    document.getElementById('s-debt-c').textContent = `${cDebt} pending`;
-    document.getElementById('s-paid').textContent   = fmt(paid);
-    document.getElementById('s-paid-c').textContent = `${cPaid} settled`;
+    document.getElementById('s-due').textContent     = fmt(due);
+    document.getElementById('s-due-c').textContent   = `${dueItems.length} pending (net)`;
+    document.getElementById('s-debt').textContent    = fmt(debt);
+    document.getElementById('s-debt-c').textContent  = `${debtItems.length} pending (net)`;
+    document.getElementById('s-paid').textContent    = fmt(paid);
+    document.getElementById('s-paid-c').textContent  = `${paidItems.length} settled`;
   }
 
   // ── FILTER / SORT ─────────────────────────────────────────
@@ -1080,16 +1258,32 @@
 
     el.innerHTML = list.map((t, i) => {
       const od = isOverdue(t);
+      const partial = parseFloat(t.partial_paid) || 0;
+      const amount  = parseFloat(t.amount) || 0;
+      const remaining = Math.max(0, amount - partial);
+      const pct = amount > 0 ? Math.min(100, (partial / amount) * 100) : 0;
+
       const tags = [
         `<span class="tag tag-${t.status.toLowerCase()}">${t.status}</span>`,
         `<span class="tag ${typeCls(t.type)}">${t.type}</span>`,
         t.given_date ? `<span class="tag tag-date">📅 ${fmtDate(t.given_date)}</span>` : '',
         t.due_date   ? `<span class="tag tag-date">⏰ ${fmtDate(t.due_date)}</span>` : '',
         od           ? `<span class="tag tag-overdue">⚠️ OVERDUE</span>` : '',
+        partial > 0 && t.status !== 'Paid' ? `<span class="tag tag-sale">⚡ Partial</span>` : '',
       ].join('');
 
       const markBtn = t.status !== 'Paid'
         ? `<button class="tx-act act-mark" onclick="markPaid('${t.id}')">✓ Paid</button>` : '';
+
+      const progressHtml = partial > 0 && t.status !== 'Paid' ? `
+        <div class="partial-wrap">
+          <div class="partial-label">
+            <span class="partial-label-left">Paid ${fmt(partial)} of ${fmt(amount)}</span>
+            <span class="partial-label-right">${pct.toFixed(0)}%</span>
+          </div>
+          <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+          <span class="remaining-badge">Remaining: ${fmt(remaining)}</span>
+        </div>` : '';
 
       return `<div class="tx-card" style="animation-delay:${Math.min(i*0.05,0.28)}s">
         <div class="tx-stripe ${stripeCls(t)}"></div>
@@ -1101,10 +1295,13 @@
             </div>
             <div class="tx-amt-wrap">
               <div class="tx-amt ${amtCls(t)}">${fmt(t.amount)}</div>
+              ${partial>0&&t.status!=='Paid'?`<div style="font-size:10px;color:var(--paid);font-weight:700;text-align:right;margin-top:2px">-${fmt(partial)}</div>`:''}
             </div>
           </div>
           <div class="tx-tags">${tags}</div>
+          ${progressHtml}
           ${t.reason?`<div class="tx-reason">"${esc(t.reason)}"</div>`:''}
+          ${t.notes?`<div class="tx-reason" style="margin-top:-4px;color:#666">${esc(t.notes)}</div>`:''}
           <div class="tx-actions">
             ${markBtn}
             <button class="tx-act act-edit" onclick="openEdit('${t.id}')">✏️ Edit</button>
@@ -1121,17 +1318,26 @@
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   }
 
+  function onTypeChange(val) {
+    document.getElementById('phone-label').textContent =
+      val === 'Debt' ? 'Their Phone (Creditor)' : 'Phone';
+  }
+
   function openSheet(data) {
     document.getElementById('sheet-ttl').textContent = data ? 'Edit Transaction' : 'Add Transaction';
-    document.getElementById('f-id').value      = data?.id || '';
-    document.getElementById('f-name').value    = data?.name || '';
-    document.getElementById('f-amt').value     = data?.amount || '';
-    document.getElementById('f-phone').value   = data?.phone || '';
-    document.getElementById('f-type').value    = data?.type || 'Due';
-    document.getElementById('f-gdate').value   = data?.given_date || today();
-    document.getElementById('f-ddate').value   = data?.due_date || '';
-    document.getElementById('f-status').value  = data?.status || 'Pending';
-    document.getElementById('f-reason').value  = data?.reason || '';
+    document.getElementById('f-id').value       = data?.id || '';
+    document.getElementById('f-name').value     = data?.name || '';
+    document.getElementById('f-amt').value      = data?.amount || '';
+    document.getElementById('f-phone').value    = data?.phone || '';
+    const typeVal = data?.type || 'Due';
+    document.getElementById('f-type').value     = typeVal;
+    document.getElementById('f-gdate').value    = data?.given_date || today();
+    document.getElementById('f-ddate').value    = data?.due_date || '';
+    document.getElementById('f-status').value   = data?.status || 'Pending';
+    document.getElementById('f-partial').value  = data?.partial_paid || '';
+    document.getElementById('f-reason').value   = data?.reason || '';
+    document.getElementById('f-notes').value    = data?.notes || '';
+    onTypeChange(typeVal);
     document.getElementById('sheet-bg').classList.add('open');
     document.body.style.overflow = 'hidden';
     setTimeout(() => document.getElementById('f-name').focus(), 420);
@@ -1161,15 +1367,18 @@
     const btn = document.getElementById('save-btn');
     btn.textContent = 'Saving…'; btn.classList.add('busy');
 
+    const partialVal = parseFloat(document.getElementById('f-partial').value) || 0;
     const payload = {
       name,
       amount: amt,
-      phone:      document.getElementById('f-phone').value.trim() || null,
-      type:       document.getElementById('f-type').value,
-      given_date: document.getElementById('f-gdate').value || null,
-      due_date:   document.getElementById('f-ddate').value || null,
-      status:     document.getElementById('f-status').value,
-      reason:     document.getElementById('f-reason').value.trim() || null,
+      phone:        document.getElementById('f-phone').value.trim() || null,
+      type:         document.getElementById('f-type').value,
+      given_date:   document.getElementById('f-gdate').value || null,
+      due_date:     document.getElementById('f-ddate').value || null,
+      status:       document.getElementById('f-status').value,
+      partial_paid: partialVal,
+      reason:       document.getElementById('f-reason').value.trim() || null,
+      notes:        document.getElementById('f-notes').value.trim() || null,
     };
 
     const id = document.getElementById('f-id').value;
@@ -1228,6 +1437,158 @@
       el.style.transform = 'translateY(10px) scale(0.95)';
       setTimeout(() => el.remove(), 300);
     }, 3500);
+  }
+
+  // ── VIEW SWITCH ──────────────────────────────────────────
+  let chartInstances = {};
+
+  function switchView(view) {
+    const isAnalytics = view === 'analytics';
+    document.getElementById('txns-view').classList.toggle('hidden', isAnalytics);
+    document.getElementById('analytics-view').classList.toggle('visible', isAnalytics);
+    document.getElementById('tab-txns').classList.toggle('on', !isAnalytics);
+    document.getElementById('tab-analytics').classList.toggle('on', isAnalytics);
+    if (isAnalytics) buildCharts();
+  }
+
+  function destroyChart(id) {
+    if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; }
+  }
+
+  function buildCharts() {
+    if (!txAll.length) {
+      document.getElementById('insight-list').innerHTML =
+        `<div class="insight-item"><span class="insight-ico">💸</span><span class="insight-text">Add some transactions to see insights!</span></div>`;
+      return;
+    }
+
+    // ── Quick stats ──
+    const overdueCount  = txAll.filter(t => isOverdue(t)).length;
+    const partialCount  = txAll.filter(t => (parseFloat(t.partial_paid)||0) > 0 && t.status !== 'Paid').length;
+    const paidRate      = txAll.length ? Math.round((txAll.filter(t=>t.status==='Paid').length / txAll.length)*100) : 0;
+    document.getElementById('an-overdue-cnt').textContent = overdueCount;
+    document.getElementById('an-partial-cnt').textContent = partialCount;
+    document.getElementById('an-paid-rate').textContent   = paidRate + '%';
+
+    const PALETTE = {
+      Due:      '#F97316', Debt:     '#3B82F6',
+      Sale:     '#8B5CF6', Purchase: '#EC4899', Other: '#6B7280',
+      Paid:     '#22C55E', Pending:  '#F59E0B',
+    };
+
+    // ── 1. By Type (donut) ──
+    const typeCounts = {};
+    txAll.forEach(t => { typeCounts[t.type] = (typeCounts[t.type]||0) + (parseFloat(t.amount)||0); });
+    destroyChart('type');
+    chartInstances['type'] = new Chart(document.getElementById('chart-type'), {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(typeCounts),
+        datasets: [{ data: Object.values(typeCounts),
+          backgroundColor: Object.keys(typeCounts).map(k => PALETTE[k]||'#999'),
+          borderWidth: 3, borderColor: '#fff', hoverOffset: 8 }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, cutout: '62%',
+        plugins: { legend: { position: 'bottom', labels: { font: { size: 11, weight: '700' }, boxWidth: 10, padding: 8 } } }
+      }
+    });
+
+    // ── 2. Status split (donut) ──
+    const paidAmt    = txAll.filter(t=>t.status==='Paid').reduce((s,t)=>s+(parseFloat(t.amount)||0),0);
+    const pendingAmt = txAll.filter(t=>t.status!=='Paid').reduce((s,t)=>s+(parseFloat(t.amount)||0),0);
+    destroyChart('status');
+    chartInstances['status'] = new Chart(document.getElementById('chart-status'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Paid','Pending'],
+        datasets: [{ data: [paidAmt, pendingAmt],
+          backgroundColor: [PALETTE.Paid, PALETTE.Pending],
+          borderWidth: 3, borderColor: '#fff', hoverOffset: 8 }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, cutout: '62%',
+        plugins: { legend: { position: 'bottom', labels: { font: { size: 11, weight: '700' }, boxWidth: 10, padding: 8 } } }
+      }
+    });
+
+    // ── 3. Timeline — count per month ──
+    const monthMap = {};
+    txAll.forEach(t => {
+      const d = new Date(t.created_at);
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      monthMap[key] = (monthMap[key]||0) + 1;
+    });
+    const sortedMonths = Object.keys(monthMap).sort();
+    const monthLabels  = sortedMonths.map(k => { const [y,m]=k.split('-'); return `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m-1]} ${y}`; });
+    destroyChart('timeline');
+    chartInstances['timeline'] = new Chart(document.getElementById('chart-timeline'), {
+      type: 'bar',
+      data: {
+        labels: monthLabels,
+        datasets: [{ label: 'Transactions', data: sortedMonths.map(k=>monthMap[k]),
+          backgroundColor: 'rgba(249,115,22,0.8)', borderRadius: 8,
+          hoverBackgroundColor: '#EA580C' }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: true, ticks: { precision: 0, font: { size: 11 } }, grid: { color: '#F0E9E0' } },
+          x: { ticks: { font: { size: 10 } }, grid: { display: false } }
+        }
+      }
+    });
+
+    // ── 4. Net bar (Due vs Debt vs Paid) ──
+    const netDue  = txAll.filter(t=>t.type==='Due' &&t.status==='Pending').reduce((s,t)=>s+Math.max(0,(parseFloat(t.amount)||0)-(parseFloat(t.partial_paid)||0)),0);
+    const netDebt = txAll.filter(t=>t.type==='Debt'&&t.status==='Pending').reduce((s,t)=>s+Math.max(0,(parseFloat(t.amount)||0)-(parseFloat(t.partial_paid)||0)),0);
+    const netPaid = txAll.filter(t=>t.status==='Paid').reduce((s,t)=>s+(parseFloat(t.amount)||0),0);
+    destroyChart('net');
+    chartInstances['net'] = new Chart(document.getElementById('chart-net'), {
+      type: 'bar',
+      data: {
+        labels: ['Net Due (owed to you)','Net Debt (you owe)','Total Paid'],
+        datasets: [{ data: [netDue, netDebt, netPaid],
+          backgroundColor: [PALETTE.Due, PALETTE.Debt, PALETTE.Paid],
+          borderRadius: 10, barThickness: 36 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+        plugins: { legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ' ' + fmt(ctx.raw) } } },
+        scales: {
+          x: { beginAtZero: true, ticks: { callback: v => curSym+v.toLocaleString(), font:{size:10} }, grid:{color:'#F0E9E0'} },
+          y: { ticks: { font: { size: 11, weight: '700' } }, grid: { display: false } }
+        }
+      }
+    });
+
+    // ── Smart insights ──
+    const insights = [];
+    const largest = [...txAll].sort((a,b)=>(parseFloat(b.amount)||0)-(parseFloat(a.amount)||0))[0];
+    if (largest) insights.push({ ico:'🏆', text:`Largest transaction: <strong>${esc(largest.name)}</strong> for <strong>${fmt(largest.amount)}</strong>` });
+    if (overdueCount) insights.push({ ico:'⚠️', text:`You have <strong>${overdueCount} overdue</strong> transaction${overdueCount>1?'s':''} — follow up soon!` });
+    if (partialCount) insights.push({ ico:'⚡', text:`<strong>${partialCount}</strong> transaction${partialCount>1?'s are':' is'} partially paid` });
+    const netBalance = netDue - netDebt;
+    if (netBalance > 0) insights.push({ ico:'📈', text:`You're owed <strong>${fmt(netBalance)}</strong> more than you owe — positive balance!` });
+    else if (netBalance < 0) insights.push({ ico:'📉', text:`You owe <strong>${fmt(Math.abs(netBalance))}</strong> more than you're owed — clear debts first.` });
+    else insights.push({ ico:'⚖️', text:`Your due and debt are <strong>perfectly balanced</strong>` });
+    if (paidRate >= 80) insights.push({ ico:'🎉', text:`<strong>${paidRate}%</strong> of your transactions are settled — great work!` });
+    else if (paidRate < 30) insights.push({ ico:'💡', text:`Only <strong>${paidRate}%</strong> settled — consider chasing pending payments.` });
+
+    document.getElementById('insight-list').innerHTML = insights.map(i =>
+      `<div class="insight-item"><span class="insight-ico">${i.ico}</span><span class="insight-text">${i.text}</span></div>`
+    ).join('');
+  }
+
+  // Update loadTx to refresh charts if analytics is visible
+  const _origLoadTx = loadTx;
+  async function loadTx() {
+    const { data, error } = await sb.from('transactions').select('*').order('created_at', { ascending: false });
+    if (error) { toast('Failed to load: ' + error.message, 'error'); return; }
+    txAll = data || [];
+    applyFilters();
+    refreshSummary();
+    if (document.getElementById('analytics-view').classList.contains('visible')) buildCharts();
   }
 
   // ── KEYBOARD ─────────────────────────────────────────────
