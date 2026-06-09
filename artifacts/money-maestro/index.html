@@ -568,6 +568,37 @@
   .fbar-clear:hover{border-color:var(--danger);color:var(--danger)}
 
   /* ══ OVERDUE BANNER ══════════════════════════ */
+  /* ── INSTALL BANNER ──────────────────────── */
+  .install-ban{margin:8px 12px 0;background:linear-gradient(135deg,rgba(249,115,22,.15),rgba(249,115,22,.08));
+    border:1.5px solid rgba(249,115,22,.35);border-radius:14px;padding:12px 14px;
+    display:flex;align-items:center;gap:10px;cursor:pointer;transition:background .15s}
+  .install-ban:active{background:rgba(249,115,22,.22)}
+  .install-ban-ico{font-size:24px;flex-shrink:0}
+  .install-ban-info{flex:1}
+  .install-ban-title{font-size:13px;font-weight:800;color:var(--orange)}
+  .install-ban-sub{font-size:11px;color:var(--text2);margin-top:1px}
+  .install-ban-btn{background:var(--orange);color:#fff;border:none;border-radius:9px;
+    padding:7px 13px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap}
+  .install-ban-x{background:none;border:none;color:var(--text3);font-size:16px;cursor:pointer;padding:2px 4px;flex-shrink:0}
+  /* ── iOS INSTALL MODAL ───────────────────── */
+  .ios-ov{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:400;
+    backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center;
+    opacity:0;pointer-events:none;transition:opacity .2s}
+  .ios-ov.open{opacity:1;pointer-events:all}
+  .ios-pn{background:var(--surf);border-radius:24px 24px 0 0;width:100%;max-width:420px;
+    padding:22px 20px 36px;transform:translateY(100%);transition:transform .3s cubic-bezier(.32,0,.15,1)}
+  .ios-ov.open .ios-pn{transform:translateY(0)}
+  .ios-hdl{width:36px;height:4px;background:var(--bord);border-radius:4px;margin:0 auto 18px}
+  .ios-title{font-size:17px;font-weight:800;color:var(--text);text-align:center;margin-bottom:6px}
+  .ios-sub{font-size:12px;color:var(--text2);text-align:center;margin-bottom:22px;line-height:1.6}
+  .ios-step{display:flex;align-items:flex-start;gap:12px;margin-bottom:16px}
+  .ios-num{width:28px;height:28px;border-radius:50%;background:var(--orange);color:#fff;
+    font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .ios-stxt{font-size:13px;color:var(--text);line-height:1.5;padding-top:4px}
+  .ios-stxt b{color:var(--orange)}
+  .ios-close{width:100%;background:var(--surf2);border:1.5px solid var(--bord);border-radius:13px;
+    padding:13px;font-size:14px;font-weight:700;color:var(--text);cursor:pointer;margin-top:6px}
+
   .od-banner{margin:6px 12px 0;background:rgba(239,68,68,.1);border:1.5px solid rgba(239,68,68,.3);
     border-radius:12px;padding:9px 12px;display:flex;align-items:center;gap:9px;cursor:pointer;
     transition:all .2s;animation:slideUp .3s ease}
@@ -721,6 +752,15 @@
     <div class="pg active" id="page-home">
       <!-- Book selector bar -->
       <div class="bk-bar" id="home-bk-bar"></div>
+      <div id="install-ban" class="install-ban hidden">
+        <div class="install-ban-ico">📲</div>
+        <div class="install-ban-info">
+          <div class="install-ban-title">Install Money Maestro</div>
+          <div class="install-ban-sub">Add to your home screen — works offline!</div>
+        </div>
+        <button class="install-ban-btn" id="install-ban-btn">Install</button>
+        <button class="install-ban-x" id="install-ban-x">✕</button>
+      </div>
       <div id="od-banner" class="od-banner hidden" onclick="navFilter('Overdue')">
         <span style="font-size:17px;flex-shrink:0">⚠️</span>
         <span class="od-banner-text" id="od-banner-text">overdue transactions</span>
@@ -828,6 +868,7 @@
           <div class="srow" onclick="navTo('books')"><div class="srico ico-am">📚</div><div class="srinfo"><div class="srlbl">My Books</div><div class="srsub">Manage account books</div></div><div class="srr">›</div></div>
           <div class="srow" onclick="navTo('settings')"><div class="srico ico-or">⚙️</div><div class="srinfo"><div class="srlbl">Settings</div><div class="srsub">Currency, preferences</div></div><div class="srr">›</div></div>
           <div class="srow" onclick="navTo('analytics')"><div class="srico ico-bl">📊</div><div class="srinfo"><div class="srlbl">Analytics</div><div class="srsub">Charts & insights</div></div><div class="srr">›</div></div>
+          <div class="srow" id="install-srow" onclick="triggerInstall()" style="display:none"><div class="srico ico-or">📲</div><div class="srinfo"><div class="srlbl">Install App</div><div class="srsub">Add to your home screen</div></div><div class="srr">›</div></div>
           <div class="srow" onclick="openTip()"><div class="srico ico-am">☕</div><div class="srinfo"><div class="srlbl">Tip the Developer</div><div class="srsub">Show some love 💛</div></div><div class="srr">›</div></div>
           <div class="srow" onclick="doLogout()"><div class="srico ico-re">🚪</div><div class="srinfo"><div class="srlbl" style="color:var(--danger)">Sign Out</div><div class="srsub">Come back soon!</div></div><div class="srr">›</div></div>
         </div>
@@ -913,6 +954,28 @@
         <button class="sum-share" onclick="shareSummary()" title="Share via…">🔗</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ═══ iOS INSTALL GUIDE ════════════════════════════ -->
+<div class="ios-ov" id="ios-ov" onclick="closeIosInstall()">
+  <div class="ios-pn" onclick="event.stopPropagation()">
+    <div class="ios-hdl"></div>
+    <div class="ios-title">📲 Install Money Maestro</div>
+    <div class="ios-sub">Follow these 3 steps in Safari to add the app to your iPhone home screen:</div>
+    <div class="ios-step">
+      <div class="ios-num">1</div>
+      <div class="ios-stxt">Tap the <b>Share button</b> at the bottom of your Safari browser <b>⬆️</b></div>
+    </div>
+    <div class="ios-step">
+      <div class="ios-num">2</div>
+      <div class="ios-stxt">Scroll down and tap <b>"Add to Home Screen"</b> 🏠</div>
+    </div>
+    <div class="ios-step">
+      <div class="ios-num">3</div>
+      <div class="ios-stxt">Tap <b>"Add"</b> in the top right — done! Open the app from your home screen anytime.</div>
+    </div>
+    <button class="ios-close" onclick="closeIosInstall()">Got it 👍</button>
   </div>
 </div>
 
@@ -2101,6 +2164,71 @@ async function shareSummary() {
   } else { copySummary(); }
 }
 
+/* ── PWA INSTALL ─────────────────────────────── */
+let _deferredInstall = null;
+const _isIos = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
+const _isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _deferredInstall = e;
+  if (!_isStandalone && !localStorage.getItem('mm_install_dismissed')) {
+    document.getElementById('install-ban').classList.remove('hidden');
+    const srow = document.getElementById('install-srow');
+    if (srow) srow.style.display = '';
+  }
+});
+
+window.addEventListener('appinstalled', () => {
+  document.getElementById('install-ban').classList.add('hidden');
+  const srow = document.getElementById('install-srow');
+  if (srow) srow.style.display = 'none';
+  _deferredInstall = null;
+  toast('App installed! 🎉 Find it on your home screen', 'success');
+});
+
+document.getElementById('install-ban-btn').addEventListener('click', e => { e.stopPropagation(); triggerInstall(); });
+document.getElementById('install-ban-x').addEventListener('click', e => {
+  e.stopPropagation();
+  document.getElementById('install-ban').classList.add('hidden');
+  localStorage.setItem('mm_install_dismissed', '1');
+});
+
+function triggerInstall() {
+  if (_deferredInstall) {
+    _deferredInstall.prompt();
+    _deferredInstall.userChoice.then(r => {
+      if (r.outcome === 'accepted') { _deferredInstall = null; document.getElementById('install-ban').classList.add('hidden'); }
+    });
+  } else if (_isIos && !_isStandalone) {
+    document.getElementById('ios-ov').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  } else if (_isStandalone) {
+    toast('App is already installed! 📲', 'info');
+  } else {
+    openIosInstall();
+  }
+}
+
+function openIosInstall() {
+  document.getElementById('ios-ov').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeIosInstall() {
+  document.getElementById('ios-ov').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// Show iOS install banner if on iOS Safari and not already installed
+(function() {
+  if (_isIos && !_isStandalone && !localStorage.getItem('mm_install_dismissed')) {
+    const ban = document.getElementById('install-ban');
+    if (ban) ban.classList.remove('hidden');
+    const srow = document.getElementById('install-srow');
+    if (srow) srow.style.display = '';
+  }
+})();
+
 /* ── CALCULATOR ──────────────────────────────── */
 let _calcTarget = null, _calcBuf = '0', _calcOp = null, _calcPrev = null, _calcFresh = false;
 function _cRend() {
@@ -2182,7 +2310,7 @@ function openTip_() { openTip(); }
 /* ── KEYBOARD ───────────────────────────────── */
 document.addEventListener('keydown', e => {
   if (e.key==='Escape') {
-    closeSheet(); closeTip(); closeBookSheet(); closeTxDetail(); closeSummary(); closeCalc();
+    closeSheet(); closeTip(); closeBookSheet(); closeTxDetail(); closeSummary(); closeCalc(); closeIosInstall();
     document.getElementById('cf-ov').classList.remove('open');
     document.getElementById('curr-modal').classList.remove('open');
     document.getElementById('mo-ov').classList.remove('open');
