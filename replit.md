@@ -73,13 +73,49 @@ Payment methods (update numbers in index.html):
 ## Supabase Config
 
 - URL: https://xrchfqafpqfvjdqbibfw.supabase.co
-- Table: `transactions` (id, user_id, name, amount, phone, type, given_date, due_date, status, reason, notes, partial_paid, created_at)
+- Anon key: see `src/lib/supabase.ts` (hardcoded, no env vars)
+- Tables: `transactions`, `books`, `settings`
 - Auth: Email + password, session auto-persisted by Supabase SDK
-- **Required SQL migrations:**
-  ```sql
-  ALTER TABLE transactions ADD COLUMN partial_paid numeric DEFAULT 0;
-  ALTER TABLE transactions ADD COLUMN notes text;
-  ```
+
+### Required SQL migrations (run ALL in Supabase SQL Editor):
+
+```sql
+-- 1. Add partial payments & notes to transactions
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS partial_paid numeric DEFAULT 0;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS notes text;
+
+-- 2. Books/Accounts table
+CREATE TABLE IF NOT EXISTS books (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  color TEXT DEFAULT '#F97316',
+  icon TEXT DEFAULT '📒',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE books ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users manage own books" ON books FOR ALL USING (auth.uid() = user_id);
+
+-- 3. Link transactions to books
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS book_id UUID REFERENCES books(id) ON DELETE SET NULL;
+
+-- 4. Admin tip settings
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public read settings" ON settings FOR SELECT USING (true);
+CREATE POLICY "Admin write settings" ON settings FOR ALL USING (auth.email() = 'smartmahid@gmail.com');
+INSERT INTO settings (key, value) VALUES
+  ('tip_bkash', '01XXXXXXXXXX'),
+  ('tip_nagad', '01XXXXXXXXXX'),
+  ('tip_card', 'buymeacoffee.com/yourname'),
+  ('tip_bank', '1234567890 · Dutch-Bangla')
+ON CONFLICT (key) DO NOTHING;
+```
 
 ## Vercel Deploy
 
