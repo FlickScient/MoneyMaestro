@@ -1247,6 +1247,11 @@ async function saveBook() {
   let error;
   if (id) { ({error} = await sb.from('books').update(payload).eq('id',id)); }
   else    { ({error} = await sb.from('books').insert(payload)); }
+  if (error && error.message && /icon/i.test(error.message)) {
+    const {icon:_ic, ...payloadNoIcon} = payload;
+    if (id) { ({error} = await sb.from('books').update(payloadNoIcon).eq('id',id)); }
+    else    { ({error} = await sb.from('books').insert(payloadNoIcon)); }
+  }
   btn.textContent='💾 Save Book'; btn.disabled=false;
   if (error) { toast('Error: '+error.message,'error'); return; }
   toast(id?'Book updated! ✅':'Book created! 📒','success');
@@ -1591,7 +1596,7 @@ function openCF({ ico, title, msg, ok='OK', cb }) {
   document.getElementById('cf-ov').classList.add('open');
 }
 function closeCF() { document.getElementById('cf-ov').classList.remove('open'); cfCb=null; }
-document.getElementById('cf-ok').onclick = () => { closeCF(); cfCb?.(); };
+document.getElementById('cf-ok').onclick = () => { const _cb = cfCb; closeCF(); _cb?.(); };
 
 /* ── CURRENCY ───────────────────────────────── */
 function openCurrModal() {
