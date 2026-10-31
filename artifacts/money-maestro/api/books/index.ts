@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getPool } from "../_lib/db";
-import { requireUserId } from "../_lib/auth";
+import { getPool } from "../_lib/db.js";
+import { requireUserId } from "../_lib/auth.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const userId = await requireUserId(req, res);
@@ -22,7 +22,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { rows } = await pool.query(
       `INSERT INTO books (user_id, name, description, icon, color)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [userId, name, description ?? null, icon ?? "📒", color ?? "#F97316"],
+      [userId, name, description ?? null, icon ?? "📔", color ?? "#F97316"],
     );
     return res.status(201).json(rows[0]);
   }
