@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getPool } from "../_lib/db";
-import { requireUserId } from "../_lib/auth";
+import { getPool } from "../_lib/db.js";
+import { requireUserId } from "../_lib/auth.js";
 
 const ALLOWED_FIELDS = [
   "name",
