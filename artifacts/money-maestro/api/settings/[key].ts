@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClerkClient } from "@clerk/backend";
-import { getPool } from "../_lib/db";
-import { requireUserId, ADMIN_EMAIL } from "../_lib/auth";
+import { getPool } from "../_lib/db.js";
+import { requireUserId, ADMIN_EMAIL } from "../_lib/auth.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const userId = await requireUserId(req, res);
