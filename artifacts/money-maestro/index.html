@@ -28,7 +28,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script
+    async
+    crossorigin="anonymous"
+    data-clerk-publishable-key="pk_test_ZXhjaXRlZC1vY3RvcHVzLTg4ODIuY2xlcmsuYWNjb3VudHMuZGV2JA"
+    src="https://excited-octopus-8882.clerk.accounts.dev/npm/@clerk/clerk-js@latest/dist/clerk.browser.js"
+    type="text/javascript"
+  ></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
   /* ══ LIGHT THEME (default) ══════════════════ */
@@ -1257,10 +1263,51 @@
 'use strict';
 
 /* ── CONFIG ─────────────────────────────────── */
-const SUPA_URL = 'https://xrchfqafpqfvjdqbibfw.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhyY2hmcWFmcHFmdmpkcWJpYmZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MTI3NTgsImV4cCI6MjA5NjQ4ODc1OH0.SleUjndCJ0SWT1n7UjGFe7TWGnAzRlx0t5wB-XlBP6Y';
-const sb = window.supabase.createClient(SUPA_URL, SUPA_KEY);
 const ADMIN_EMAIL = 'smartmahid@gmail.com';
+
+/* Thin wrapper so the rest of the app can keep calling api.books.list() etc.
+   without caring about fetch/auth-header plumbing. Every call attaches the
+   current Clerk session token and talks to our own /api/* serverless functions
+   (which verify that token and run the Postgres query on Neon). */
+async function apiFetch(path, opts = {}) {
+  const token = await window.Clerk.session?.getToken();
+  const res = await fetch(path, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(opts.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    let msg = res.statusText;
+    try { const j = await res.json(); if (j?.error) msg = j.error; } catch (e) {}
+    const err = new Error(msg);
+    err.status = res.status;
+    throw err;
+  }
+  if (res.status === 204) return null;
+  return res.json();
+}
+const api = {
+  books: {
+    list: () => apiFetch('/api/books'),
+    create: (payload) => apiFetch('/api/books', { method: 'POST', body: JSON.stringify(payload) }),
+    update: (id, payload) => apiFetch(`/api/books/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+    remove: (id) => apiFetch(`/api/books/${id}`, { method: 'DELETE' }),
+  },
+  transactions: {
+    list: () => apiFetch('/api/transactions'),
+    create: (payload) => apiFetch('/api/transactions', { method: 'POST', body: JSON.stringify(payload) }),
+    update: (id, payload) => apiFetch(`/api/transactions/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+    patch: (id, payload) => apiFetch(`/api/transactions/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+    remove: (id) => apiFetch(`/api/transactions/${id}`, { method: 'DELETE' }),
+  },
+  settings: {
+    list: () => apiFetch('/api/settings'),
+    upsert: (key, value) => apiFetch(`/api/settings/${key}`, { method: 'PUT', body: JSON.stringify({ value }) }),
+  },
+};
 
 /* ── STATE ──────────────────────────────────── */
 let txAll=[], txFilt=[], books=[];
@@ -1323,47 +1370,42 @@ function authErr(id, msg) {
   el.classList.add('show');
   setTimeout(() => el.classList.remove('show'), 5000);
 }
-async function doLogin() {
-  const email = document.getElementById('login-email').value.trim();
-  const pw    = document.getElementById('login-pw').value;
-  if (!email || !pw) { authErr('login-err','Fill in all fields'); return; }
-  const btn = document.getElementById('login-btn');
-  btn.textContent='Signing in…'; btn.disabled=true;
-  const { error } = await sb.auth.signInWithPassword({ email, password: pw });
-  btn.textContent='Sign In'; btn.disabled=false;
-  if (error) authErr('login-err', error.message);
+// Sign-in/up now go through Clerk's own hosted modal (handles password rules,
+// email verification, etc. for us) instead of the custom email/password form.
+function doLogin() {
+  window.Clerk.openSignIn({ afterSignInUrl: window.location.href });
 }
-async function doRegister() {
-  const name  = document.getElementById('reg-name').value.trim();
-  const email = document.getElementById('reg-email').value.trim();
-  const pw    = document.getElementById('reg-pw').value;
-  if (!name||!email||!pw) { authErr('reg-err','Fill in all fields'); return; }
-  if (pw.length < 6)      { authErr('reg-err','Password min 6 characters'); return; }
-  const btn = document.getElementById('reg-btn');
-  btn.textContent='Creating…'; btn.disabled=true;
-  const { error } = await sb.auth.signUp({ email, password: pw, options: { data: { full_name: name } } });
-  btn.textContent='Create Account'; btn.disabled=false;
-  if (error) authErr('reg-err', error.message);
-  else { toast('Account created! Check your email.','success'); showAuth('auth-login'); }
+function doRegister() {
+  window.Clerk.openSignUp({ afterSignUpUrl: window.location.href });
 }
 function doLogout() {
   openCF({ ico:'🚪', title:'Sign Out', msg:'Are you sure?', ok:'Sign Out', cb: async () => {
-    await sb.auth.signOut(); location.reload();
+    await window.Clerk.signOut();
+    location.reload();
   }});
 }
 
-sb.auth.onAuthStateChange(async (ev, session) => {
-  if (session?.user) {
-    curUser = session.user;
-    isAdmin = curUser.email === ADMIN_EMAIL;
-    document.getElementById('auth-screen').classList.add('hidden');
-    document.getElementById('main-app').classList.remove('hidden');
-    initApp();
-  } else {
-    document.getElementById('auth-screen').classList.remove('hidden');
-    document.getElementById('main-app').classList.add('hidden');
-  }
-});
+async function initClerkAuth() {
+  await window.Clerk.load();
+  window.Clerk.addListener(({ user }) => {
+    if (user) {
+      curUser = {
+        id: user.id,
+        email: user.primaryEmailAddress?.emailAddress || '',
+        user_metadata: { full_name: user.fullName || user.firstName || '' },
+      };
+      isAdmin = curUser.email === ADMIN_EMAIL;
+      document.getElementById('auth-screen').classList.add('hidden');
+      document.getElementById('main-app').classList.remove('hidden');
+      initApp();
+    } else {
+      curUser = null;
+      document.getElementById('auth-screen').classList.remove('hidden');
+      document.getElementById('main-app').classList.add('hidden');
+    }
+  });
+}
+initClerkAuth();
 
 /* ── APP INIT ────────────────────────────────── */
 async function initApp() {
@@ -1384,9 +1426,8 @@ async function initApp() {
 
 /* ── BOOKS ──────────────────────────────────── */
 async function loadBooks() {
-  const { data, error } = await sb.from('books').select('*').order('created_at',{ascending:true});
-  if (error) { console.warn('Books load:', error.message); books = []; }
-  else books = data || [];
+  try { books = await api.books.list() || []; }
+  catch (error) { console.warn('Books load:', error.message); books = []; }
   renderBookBars();
   renderBookSelector();
   renderBooksPage();
@@ -1558,16 +1599,13 @@ async function saveBook() {
   if (!name) { toast('Book name required','error'); return; }
   const btn = document.getElementById('bk-save-btn');
   btn.textContent='Saving…'; btn.disabled=true;
-  const payload = { name, description: document.getElementById('bk-f-desc').value.trim()||null, icon: selBookIco, color: selBookCol, user_id: curUser.id };
+  const payload = { name, description: document.getElementById('bk-f-desc').value.trim()||null, icon: selBookIco, color: selBookCol };
   const id = document.getElementById('bk-f-id').value;
   let error;
-  if (id) { ({error} = await sb.from('books').update(payload).eq('id',id)); }
-  else    { ({error} = await sb.from('books').insert(payload)); }
-  if (error && error.message && /icon/i.test(error.message)) {
-    const {icon:_ic, ...payloadNoIcon} = payload;
-    if (id) { ({error} = await sb.from('books').update(payloadNoIcon).eq('id',id)); }
-    else    { ({error} = await sb.from('books').insert(payloadNoIcon)); }
-  }
+  try {
+    if (id) await api.books.update(id, payload);
+    else    await api.books.create(payload);
+  } catch (e) { error = e; }
   btn.textContent='💾 Save Book'; btn.disabled=false;
   if (error) { toast('Error: '+error.message,'error'); return; }
   toast(id?'Book updated! ✅':'Book created! 📒','success');
@@ -1579,8 +1617,8 @@ function askDelBook(id) {
   openCF({ ico:'🗑', title:'Delete Book?',
     msg:`Delete "<strong>${esc(b?.name||'this')}</strong>"? Transactions in this book will NOT be deleted — they'll just become unlinked.`,
     ok:'Delete', cb: async () => {
-      const { error } = await sb.from('books').delete().eq('id', id);
-      if (error) { toast('Delete failed','error'); return; }
+      try { await api.books.remove(id); }
+      catch (error) { toast('Delete failed','error'); return; }
       if (curBook === id) { curBook = null; localStorage.setItem('mm_book',''); }
       toast('Book deleted','info');
       await loadBooks();
@@ -1596,8 +1634,9 @@ function renderBookSelector() {
 
 /* ── LOAD TRANSACTIONS ──────────────────────── */
 async function loadTx() {
-  const { data, error } = await sb.from('transactions').select('*').order('created_at',{ascending:false});
-  if (error) { toast('Load failed: '+error.message,'error'); return; }
+  let data;
+  try { data = await api.transactions.list(); }
+  catch (error) { toast('Load failed: '+error.message,'error'); return; }
   txAll = data || [];
   applyFilters();
   refreshSummary();
@@ -1842,8 +1881,10 @@ async function saveTx() {
   btn.textContent='Saving…'; btn.disabled=true;
   const id = document.getElementById('f-id').value;
   let error;
-  if (id) { ({error} = await sb.from('transactions').update(payload).eq('id',id)); }
-  else    { ({error} = await sb.from('transactions').insert({...payload, user_id: curUser.id})); }
+  try {
+    if (id) await api.transactions.update(id, payload);
+    else    await api.transactions.create(payload);
+  } catch (e) { error = e; }
   btn.textContent = id?'✅ Update':'💾 Save Transaction'; btn.disabled=false;
   if (error) { toast('Error: '+error.message,'error'); return; }
   toast(id?'Updated!':'Added! 🎉','success');
@@ -1853,8 +1894,8 @@ async function saveTx() {
 
 /* ── MARK PAID / DELETE ─────────────────────── */
 async function markPaid(id) {
-  const { error } = await sb.from('transactions').update({status:'Paid',partial_paid:0}).eq('id',id);
-  if (error) { toast('Error: '+error.message,'error'); return; }
+  try { await api.transactions.patch(id, {status:'Paid',partial_paid:0}); }
+  catch (error) { toast('Error: '+error.message,'error'); return; }
   toast('Marked as paid ✅','success');
   await loadTx();
 }
@@ -1863,8 +1904,8 @@ function askDel(id) {
   openCF({ ico:'🗑', title:'Delete Transaction?',
     msg:`Delete "<strong>${esc(t?.name||'this')}</strong>"? This cannot be undone.`,
     ok:'Delete', cb: async () => {
-      const { error } = await sb.from('transactions').delete().eq('id',id);
-      if (error) { toast('Delete failed','error'); return; }
+      try { await api.transactions.remove(id); }
+      catch (error) { toast('Delete failed','error'); return; }
       toast('Deleted','info');
       await loadTx();
     }
@@ -1892,7 +1933,7 @@ function exportCSV() {
 /* ── TIP SETTINGS ───────────────────────────── */
 async function loadTipSettings() {
   try {
-    const { data } = await sb.from('settings').select('key,value');
+    const data = await api.settings.list();
     if (data) data.forEach(r => { tipData[r.key] = r.value; });
   } catch(e) {}
   renderTipData();
@@ -1921,7 +1962,9 @@ async function saveTipField(key, inpId, numId, editRowId) {
   const val = document.getElementById(inpId).value.trim();
   if (!val) { toast('Enter a value','error'); return; }
   const btn = event?.target; if(btn){btn.textContent='Saving…';btn.disabled=true;}
-  const { error } = await sb.from('settings').upsert({key,value:val},{onConflict:'key'});
+  let error;
+  try { await api.settings.upsert(key, val); }
+  catch (e) { error = e; }
   if(btn){btn.textContent='Save';btn.disabled=false;}
   if (error) { toast('Save failed: '+error.message,'error'); return; }
   tipData[key]=val;
