@@ -28,12 +28,21 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <script>
+    // Catch-all so JS errors show up as a popup on your phone instead of
+    // vanishing into a console you can't open. Remove this once everything works.
+    window.onerror = function(msg, src, line, col, err) {
+      alert('PAGE JS ERROR:\n' + msg + '\nfile: ' + src + '\nline: ' + line + ':' + col);
+      return false;
+    };
+  </script>
   <script
     async
     crossorigin="anonymous"
     data-clerk-publishable-key="pk_test_ZXhjaXRlZC1vY3RvcHVzLTg4ODIuY2xlcmsuYWNjb3VudHMuZGV2JA"
     src="https://excited-octopus-8882.clerk.accounts.dev/npm/@clerk/clerk-js@latest/dist/clerk.browser.js"
     type="text/javascript"
+    onload="window.__onClerkScriptLoaded && window.__onClerkScriptLoaded()"
   ></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
@@ -1373,10 +1382,16 @@ function authErr(id, msg) {
 // Sign-in/up now go through Clerk's own hosted modal (handles password rules,
 // email verification, etc. for us) instead of the custom email/password form.
 function doLogin() {
-  window.Clerk.openSignIn({ afterSignInUrl: window.location.href });
+  try {
+    if (!window.Clerk) { alert('Clerk has not loaded yet (window.Clerk is missing). Check your internet connection and reload. If this keeps happening, it means the Clerk script failed to load.'); return; }
+    window.Clerk.openSignIn({ afterSignInUrl: window.location.href });
+  } catch (e) { alert('Sign in error: ' + (e && e.message ? e.message : e)); }
 }
 function doRegister() {
-  window.Clerk.openSignUp({ afterSignUpUrl: window.location.href });
+  try {
+    if (!window.Clerk) { alert('Clerk has not loaded yet (window.Clerk is missing). Check your internet connection and reload.'); return; }
+    window.Clerk.openSignUp({ afterSignUpUrl: window.location.href });
+  } catch (e) { alert('Sign up error: ' + (e && e.message ? e.message : e)); }
 }
 function doLogout() {
   openCF({ ico:'🚪', title:'Sign Out', msg:'Are you sure?', ok:'Sign Out', cb: async () => {
@@ -1385,8 +1400,16 @@ function doLogout() {
   }});
 }
 
+let clerkInitStarted = false;
 async function initClerkAuth() {
-  await window.Clerk.load();
+  if (clerkInitStarted) return; // guard against double-init from the race-fix below
+  clerkInitStarted = true;
+  try {
+    await window.Clerk.load();
+  } catch (e) {
+    alert('Clerk failed to load: ' + (e && e.message ? e.message : e));
+    return;
+  }
   window.Clerk.addListener(({ user }) => {
     if (user) {
       curUser = {
@@ -1405,7 +1428,11 @@ async function initClerkAuth() {
     }
   });
 }
-initClerkAuth();
+// The Clerk <script> tag loads async, so window.Clerk may not exist yet when
+// this inline script runs. Wire up to the script's onload event; also try
+// immediately in case it already finished loading by the time we get here.
+window.__onClerkScriptLoaded = initClerkAuth;
+if (window.Clerk) initClerkAuth();
 
 /* ── APP INIT ────────────────────────────────── */
 async function initApp() {
